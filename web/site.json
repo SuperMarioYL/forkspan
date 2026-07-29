@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "name": "forkspan",
+  "github": "https://github.com/SuperMarioYL/forkspan",
+  "host": "forkspan.lei6393.com",
+  "lang": { "primary": "zh", "toggle": true },
+  "accent": ["#e6a144", "#d4881f", "#b36b14"],
+  "hero": {
+    "eyebrow": { "zh": "本地 · 无账号 · 单二进制", "en": "Local · No account · Single binary" },
+    "headline": {
+      "zh": "Agent 被劫持时\n别杀掉整个运行",
+      "en": "When an agent is hijacked,\ndon't kill the whole run"
+    },
+    "sub": {
+      "zh": "在入侵那一刻冻结状态，保住能解释\"怎么被攻破\"的因果链——一条命令看清 agent 已经碰到什么、还能碰到什么。",
+      "en": "Freeze the state at the moment of compromise and keep the causal chain that explains how the break-in triggered — one command shows what the agent already touched and what it could still reach."
+    },
+    "command": "forkspan inspect trace.json",
+    "cta": { "zh": "查看取证流程", "en": "See the IR flow" },
+    "ctaGithub": { "zh": "GitHub 源码", "en": "GitHub source" },
+    "scroll": { "zh": "往下看", "en": "Scroll" }
+  },
+  "advantages": [
+    {
+      "title": { "zh": "在入侵那一刻冻结状态", "en": "Freeze the state at the moment of compromise" },
+      "body": {
+        "zh": "标记被攻破的那一步，导出这一刻的快照：agent 已经走到哪、哪些工具调用还够得着、以及不透明的内部状态点。因果链不断，事后能做受控实验，而不是只剩推断。",
+        "en": "Mark the compromised step and dump the snapshot at that instant: which steps the agent had reached, which tool calls were still reachable, and the opaque internal state checkpoint. The causal chain stays intact — a controlled experiment later, not just an inference."
+      },
+      "chips": ["› 已达步骤树", "› 可达工具调用集", "› 内部状态检查点"]
+    },
+    {
+      "title": { "zh": "读你 agent 已经在产的标准格式", "en": "Reads the standard format your agents already emit" },
+      "body": {
+        "zh": "直接吃一份标准导出文件，还原成步骤树与工具调用子图。不用改 agent、不用装 collector、不用额外埋点——你已经有的数据就够。",
+        "en": "Ingests a standard export file straight into a step tree and tool-call subgraph. No agent changes, no collector to install, no extra instrumentation — the data you already have is enough."
+      },
+      "chips": ["› 标准 OTel 导出", "› 纯本地解析", "› 无守护进程"]
+    },
+    {
+      "title": { "zh": "终端里走查整条因果链", "en": "Walk the whole causal chain in your terminal" },
+      "body": {
+        "zh": "一条命令打开导航器，在步骤树里定位入侵点、翻看前后文。单二进制、零配置、离线可用——取证就该这么直接。",
+        "en": "One command opens a navigator to roam the step tree and pin the intrusion in context. Single binary, zero config, fully offline — forensics should be this direct."
+      },
+      "chips": ["› 单二进制", "› 零配置", "› 完全离线"]
+    }
+  ],
+  "scene": { "kind": "mesh" },
+  "cta": {
+    "headline": { "zh": "下一次 agent 失控时，先别 kill", "en": "Next time an agent goes rogue, don't kill it first" },
+    "sub": { "zh": "装上 ForkSpan，在被攻破的那一刻把状态冻下来。", "en": "Install ForkSpan and freeze the state the moment compromise is detected." },
+    "button": { "zh": "go install", "en": "go install" }
+  },
+  "footer": { "tag": { "zh": "MIT 开源 · 给做事件响应的工程师", "en": "MIT open source · for engineers doing incident response" } }
+}
