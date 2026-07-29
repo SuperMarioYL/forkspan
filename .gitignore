@@ -1,0 +1,38 @@
+# Go binaries and build output
+/forkspan
+/forkspan.exe
+*.exe
+*.test
+*.out
+/bin/
+/dist/
+
+# Go workspace scratch
+go.work
+go.work.sum
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local runtime artifacts (snapshots dumped from the TUI)
+forkspan-snapshot.json
+forkspan-*.json
+
+# Demo render scratch
+*.cast
+
+# Build scratch and pipeline control files
+.build_metadata*
+.builder_*
+.spawn.*
+.stage_*
+BUILD_SETUP_NEXT_STEPS.md
+PUBLISH_BLOCKED.md
+
+# Agent / assistant scratch (never ship)
+.claude/
+CLAUDE.md
