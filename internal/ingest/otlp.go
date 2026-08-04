@@ -229,6 +229,13 @@ func convertSpanJSON(sp otlpSpanJSON) Span {
 		s.Role = RoleAgent
 	default:
 		s.Role = inferRole(s.Name)
+		// A span that fell back to name-based inference may still carry
+		// gen_ai.tool.name (e.g. "tool.chat" with no gen_ai.operation.name);
+		// lift it into ToolName so the span is not dropped from the tool-call
+		// subgraph with an empty tool name.
+		if s.Role == RoleTool {
+			s.ToolName = s.AttrString("gen_ai.tool.name")
+		}
 	}
 
 	s.Input = []byte(s.AttrString("gen_ai.request.content"))
@@ -366,6 +373,13 @@ func convertSpanProto(sp *otlp.Span) Span {
 		s.Role = RoleAgent
 	default:
 		s.Role = inferRole(s.Name)
+		// A span that fell back to name-based inference may still carry
+		// gen_ai.tool.name (e.g. "tool.chat" with no gen_ai.operation.name);
+		// lift it into ToolName so the span is not dropped from the tool-call
+		// subgraph with an empty tool name.
+		if s.Role == RoleTool {
+			s.ToolName = s.AttrString("gen_ai.tool.name")
+		}
 	}
 	s.Input = []byte(s.AttrString("gen_ai.request.content"))
 	if len(s.Input) == 0 {
@@ -483,11 +497,16 @@ func hexEncode(b []byte) string {
 
 func inferRole(name string) GenAIRole {
 	switch {
+	// Tool hints take precedence over the bare "chat" substring so a span
+	// named e.g. "tool.chat" (with no gen_ai.operation.name) is classified
+	// Tool, not LLM — otherwise its gen_ai.tool.name would be dropped and the
+	// span silently excluded from the tool-call subgraph. Genuine LLM spans
+	// ("llm.chat", "chat") carry no "tool" substring and still match LLM.
+	case contains(name, "tool.call"), contains(name, "execute_tool"), contains(name, "tool"):
+		return RoleTool
 	case contains(name, "llm.chat"), contains(name, "llm"), contains(name, "chat"):
 		return RoleLLM
-	case contains(name, "tool.call"), contains(name, "tool"), contains(name, "execute_tool"):
-		return RoleTool
-	case contains(name, "agent.invoke"), contains(name, "agent"), contains(name, "invoke_agent"):
+	case contains(name, "agent.invoke"), contains(name, "invoke_agent"), contains(name, "agent"):
 		return RoleAgent
 	}
 	return RoleUnknown

@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "0.1.0"
+var version = "v0.2.0"
 
 func main() {
 	if err := newRoot().Execute(); err != nil {
@@ -103,9 +103,16 @@ func snapshotOutPath(asJSON bool, out string) string {
 	return "forkspan-snapshot.json"
 }
 
-// newForkCmd is the m2 milestone entry point. In m1 it prints a roadmap
-// pointer rather than faking counterfactual projection.
+// newForkCmd is the m2 milestone entry point. In v0.1 it prints a roadmap
+// pointer rather than faking counterfactual projection. It still registers
+// the documented m2 flags (--span / --block-tool, see README.md §Usage and
+// docs/demo.tape) so the documented invocations parse and print the roadmap
+// pointer instead of cobra exiting 1 on "unknown flag: --span".
 func newForkCmd() *cobra.Command {
+	var (
+		spanID    string
+		blockTool string
+	)
 	c := &cobra.Command{
 		Use:   "fork",
 		Short: "Snapshot the recorded state at a span and apply a counterfactual (m2 milestone)",
@@ -115,12 +122,18 @@ func newForkCmd() *cobra.Command {
 			return nil
 		},
 	}
+	c.Flags().StringVar(&spanID, "span", "", "snapshot the StateSnapshot at this span id (m2 milestone)")
+	c.Flags().StringVar(&blockTool, "block-tool", "", "block this tool-call in the counterfactual branch (m2 milestone)")
 	return c
 }
 
 // newReplayCmd is the m2/m3 milestone entry point (counterfactual projection +
-// side-by-side diff). In m1 it prints a roadmap pointer.
+// side-by-side diff). In v0.1 it prints a roadmap pointer. It registers the
+// documented m2/m3 flag (--branch, see README.md §Usage and docs/demo.tape)
+// so the documented invocations parse and print the roadmap pointer instead
+// of cobra exiting 1 on "unknown flag: --branch".
 func newReplayCmd() *cobra.Command {
+	var branch string
 	c := &cobra.Command{
 		Use:   "replay",
 		Short: "Project a counterfactual branch and render the recorded-vs-projected diff (m2/m3)",
@@ -130,6 +143,7 @@ func newReplayCmd() *cobra.Command {
 			return nil
 		},
 	}
+	c.Flags().StringVar(&branch, "branch", "", "replay the counterfactual branch with this id (m2/m3)")
 	return c
 }
 

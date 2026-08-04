@@ -101,3 +101,76 @@ func TestToolCalls_OrderedByStart(t *testing.T) {
 		}
 	}
 }
+
+// TestInferRole_ToolPrecedenceOverChat is the regression test for
+// fix-inferrole-tool-misclass: a span named "tool.chat" with no
+// gen_ai.operation.name must classify as Tool (not LLM) and lift its
+// gen_ai.tool.name, so it is not silently dropped from the tool-call
+// subgraph. Genuine LLM spans ("llm.chat" / "chat") keep their classification.
+func TestInferRole_ToolPrecedenceOverChat(t *testing.T) {
+	const toolChatTrace = `{
+	  "resourceSpans": [{
+	    "scopeSpans": [{
+	      "spans": [{
+	        "traceId": "00112233445566778899aabbccddeeff",
+	        "spanId": "99aa99aa99aa99aa",
+	        "name": "tool.chat",
+	        "kind": "SPAN_KIND_CLIENT",
+	        "startTimeUnixNano": "1785283200100000000",
+	        "endTimeUnixNano": "1785283200150000000",
+	        "attributes": [
+	          { "key": "gen_ai.system", "value": { "stringValue": "demo" } },
+	          { "key": "gen_ai.tool.name", "value": { "stringValue": "chat-tool" } }
+	        ],
+	        "status": { "code": "STATUS_CODE_OK" }
+	      }]
+	    }]
+	  }]
+	}`
+	tr, err := LoadBytes([]byte(toolChatTrace))
+	if err != nil {
+		t.Fatalf("LoadBytes: %v", err)
+	}
+	s := tr.Get("99aa99aa99aa99aa")
+	if s == nil {
+		t.Fatal("missing span")
+	}
+	if s.Role != RoleTool {
+		t.Errorf("tool.chat Role = %q, want %q (Tool must win over bare \"chat\")", s.Role, RoleTool)
+	}
+	if s.ToolName != "chat-tool" {
+		t.Errorf("ToolName = %q, want \"chat-tool\" (gen_ai.tool.name must lift in the fallback path)", s.ToolName)
+	}
+	if !s.IsToolCall() {
+		t.Error("span should be a tool call (must stay in the tool-call subgraph)")
+	}
+	// Genuine LLM spans with no gen_ai.operation.name must still classify LLM.
+	for _, name := range []string{"llm.chat", "chat"} {
+		llmTrace := `{
+		  "resourceSpans": [{
+		    "scopeSpans": [{
+		      "spans": [{
+		        "traceId": "00112233445566778899aabbccddeeff",
+		        "spanId": "aa11aa11aa11aa11",
+		        "name": "` + name + `",
+		        "kind": "SPAN_KIND_INTERNAL",
+		        "startTimeUnixNano": "1785283200100000000",
+		        "endTimeUnixNano": "1785283200150000000",
+		        "attributes": [
+		          { "key": "gen_ai.system", "value": { "stringValue": "demo" } }
+		        ],
+		        "status": { "code": "STATUS_CODE_OK" }
+		      }]
+		    }]
+		  }]
+		}`
+		lt, err := LoadBytes([]byte(llmTrace))
+		if err != nil {
+			t.Fatalf("LoadBytes(%q): %v", name, err)
+		}
+		l := lt.Get("aa11aa11aa11aa11")
+		if l.Role != RoleLLM {
+			t.Errorf("%q Role = %q, want %q (genuine LLM classification must be preserved)", name, l.Role, RoleLLM)
+		}
+	}
+}
