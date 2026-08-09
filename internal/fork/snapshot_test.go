@@ -116,6 +116,32 @@ func TestSnapshot_MarshalJSON(t *testing.T) {
 	}
 }
 
+func TestSnapshot_SelfCycleParentIDDoesNotHang(t *testing.T) {
+	// A span whose parentSpanId == spanId (a malformed / compromised-agent trace)
+	// must NOT hang the parent-walk or the children-DFS in Snapshot. Without the
+	// visited-set guard this loops forever; with it, the cycle is broken and the
+	// self-cycle span is its own only reached span (and its own only reachable
+	// tool call). Run with -timeout to catch a regression.
+	spans := []ingest.Span{
+		{SpanID: "dead0000dead0000", ParentID: "dead0000dead0000", TraceID: "t",
+			Name: "tool.call.bash", Role: ingest.RoleTool, ToolName: "bash"},
+	}
+	tr := ingest.NewTree(spans)
+	snap, err := Snapshot(tr, "dead0000dead0000")
+	if err != nil {
+		t.Fatalf("Snapshot on self-cycle span: %v", err)
+	}
+	if len(snap.ReachedSpans) != 1 {
+		t.Fatalf("len(ReachedSpans) = %d, want 1 (self only, cycle broken)", len(snap.ReachedSpans))
+	}
+	if snap.ReachedSpans[0].SpanID != "dead0000dead0000" {
+		t.Errorf("ReachedSpans[0] = %s, want the self-cycle span", snap.ReachedSpans[0].SpanID)
+	}
+	if len(snap.ReachableToolCalls) != 1 || snap.ReachableToolCalls[0] != "dead0000dead0000" {
+		t.Errorf("ReachableToolCalls = %v, want [dead0000dead0000] (cycle broken)", snap.ReachableToolCalls)
+	}
+}
+
 func contains(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {

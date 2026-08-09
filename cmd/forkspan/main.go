@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "v0.2.0"
+var version = "v0.3.0"
 
 func main() {
 	if err := newRoot().Execute(); err != nil {

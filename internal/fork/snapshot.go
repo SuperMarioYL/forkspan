@@ -78,8 +78,13 @@ func Snapshot(tree *ingest.Tree, atSpanID string) (StateSnapshot, error) {
 	}
 
 	// Reached spans: walk up the parent chain, then reverse to root→leaf.
+	// Guard against a cyclic / self-referential ParentID (a malformed or
+	// compromised-agent trace) so the walk terminates instead of hanging —
+	// a span whose parentSpanId == spanId must not loop forever here.
 	var chain []string
-	for cur := tree.Get(atSpanID); cur != nil; cur = tree.Get(cur.ParentID) {
+	seen := map[string]bool{}
+	for cur := tree.Get(atSpanID); cur != nil && !seen[cur.SpanID]; cur = tree.Get(cur.ParentID) {
+		seen[cur.SpanID] = true
 		chain = append(chain, cur.SpanID)
 	}
 	for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
@@ -91,10 +96,17 @@ func Snapshot(tree *ingest.Tree, atSpanID string) (StateSnapshot, error) {
 	}
 
 	// Reachable tool-calls: DFS from atSpanID's children, collect tool spans.
+	// Guard against a cyclic ParentID among descendants (mirrors diff.Subgraph's
+	// `seen` set) so a malformed trace cannot make the DFS recurse forever.
 	var reachable []string
+	seenKids := map[string]bool{}
 	var walk func(id string)
 	walk = func(id string) {
 		for _, cid := range tree.Children(id) {
+			if seenKids[cid] {
+				continue
+			}
+			seenKids[cid] = true
 			c := tree.Get(cid)
 			if c == nil {
 				continue

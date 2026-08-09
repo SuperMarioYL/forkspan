@@ -26,6 +26,7 @@ type model struct {
 	flash    string // last action feedback
 	width    int
 	height   int
+	seen     map[string]bool // cycle guard for the DFS flatten (mirrors diff.Subgraph)
 }
 
 var (
@@ -55,9 +56,16 @@ func newModel(tree *ingest.Tree, preMark string) *model {
 }
 
 // flatten produces a DFS-preorder list of the tree with indentation depths.
+// A `seen` set guards the DFS against a cyclic ParentID (a malformed /
+// compromised-agent trace) so the navigator never recurses forever.
 func (m *model) flatten() {
 	m.rows = m.rows[:0]
+	m.seen = map[string]bool{}
 	for _, root := range m.tree.Roots() {
+		if m.seen[root] {
+			continue
+		}
+		m.seen[root] = true
 		m.walk(root, 0)
 	}
 }
@@ -69,6 +77,10 @@ func (m *model) walk(id string, depth int) {
 	}
 	m.rows = append(m.rows, node{span: *s, depth: depth})
 	for _, cid := range m.tree.Children(id) {
+		if m.seen[cid] {
+			continue
+		}
+		m.seen[cid] = true
 		m.walk(cid, depth+1)
 	}
 }
