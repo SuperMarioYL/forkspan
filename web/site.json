@@ -5,8 +5,13 @@
   "host": "forkspan.lei6393.com",
   "lang": { "primary": "zh", "toggle": true },
   "accent": ["#e6a144", "#d4881f", "#b36b14"],
-  "content_version": "v0.2.0",
+  "content_version": "v0.3.0",
   "changelog": [
+    {
+      "version": "v0.3.0",
+      "zh": "哪怕被攻破的 agent 把调用链改得乱七八糟（断掉或自指的父链接），快照也不会卡死——照样把那一刻的状态给你，而不是一个冻住的终端。",
+      "en": "Even when a compromised agent mangles the call chain — broken or self-referencing links — the snapshot won't lock up. You still get the state at that moment, not a frozen terminal."
+    },
     {
       "version": "v0.2.0",
       "zh": "照文档敲的 fork/replay 命令现在能正常解析并指路，不再报未知参数；工具调用不再被误判漏掉，能触达的工具一条都不漏。",
@@ -35,7 +40,7 @@
         "zh": "标记被攻破的那一步，导出这一刻的快照：agent 已经走到哪、还能碰到哪些工具调用、以及不透明的内部状态点。能触达的工具调用一条都不漏——因果链不断，事后能做受控实验，而不是只剩推断。",
         "en": "Mark the compromised step and dump the snapshot at that instant: which steps the agent had reached, which tool calls it could still reach, and the opaque internal state checkpoint. Every reachable tool call stays in the set — none silently vanish — so the causal chain stays intact for a controlled experiment later, not just an inference."
       },
-      "chips": ["› 已达步骤树", "› 可达工具调用集", "› 内部状态检查点"]
+      "chips": ["› 已达步骤树", "› 可达工具调用集", "› 内部状态检查点", "› 乱链也不卡死"]
     },
     {
       "title": { "zh": "读你 agent 已经在产的标准格式", "en": "Reads the standard format your agents already emit" },
