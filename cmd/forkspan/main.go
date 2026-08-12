@@ -69,14 +69,19 @@ func newInspectCmd() *cobra.Command {
 
 			// Non-interactive snapshot dump path (the m1 "dump to stdout").
 			if snapshotID != "" {
-				b, err := tui.DumpSnapshot(tree, snapshotID, snapshotOutPath(asJSON, outPath))
+				// Resolve the destination once and drive the print branch on
+				// --json alone: an explicit --out is honored under --json
+				// (file + stdout), and the default-path case no longer echoes
+				// the full JSON to stdout AND writes the file.
+				resolved := snapshotOutPath(asJSON, outPath)
+				b, err := tui.DumpSnapshot(tree, snapshotID, resolved)
 				if err != nil {
 					return err
 				}
-				if asJSON || outPath == "" {
+				if asJSON {
 					fmt.Fprintln(cmd.OutOrStdout(), string(b))
 				} else {
-					fmt.Fprintf(cmd.OutOrStdout(), "snapshot written → %s\n", outPath)
+					fmt.Fprintf(cmd.OutOrStdout(), "snapshot written → %s\n", resolved)
 				}
 				return nil
 			}
@@ -93,12 +98,16 @@ func newInspectCmd() *cobra.Command {
 	return c
 }
 
+// snapshotOutPath resolves where DumpSnapshot should write the snapshot JSON.
+// An explicit --out always wins (so `--json -o <path>` writes the file AND
+// echoes JSON to stdout). Without --out: --json dumps to stdout only ("-",
+// no file); the plain default writes forkspan-snapshot.json.
 func snapshotOutPath(asJSON bool, out string) string {
-	if asJSON {
-		return "-" // stdout
-	}
 	if out != "" {
 		return out
+	}
+	if asJSON {
+		return "-" // stdout, no file
 	}
 	return "forkspan-snapshot.json"
 }
