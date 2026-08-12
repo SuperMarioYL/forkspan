@@ -3,10 +3,22 @@
   "name": "forkspan",
   "github": "https://github.com/SuperMarioYL/forkspan",
   "host": "forkspan.lei6393.com",
-  "lang": { "primary": "zh", "toggle": true },
-  "accent": ["#e6a144", "#d4881f", "#b36b14"],
-  "content_version": "v0.3.0",
+  "lang": {
+    "primary": "zh",
+    "toggle": true
+  },
+  "accent": [
+    "#e6a144",
+    "#d4881f",
+    "#b36b14"
+  ],
+  "content_version": "v0.4.0",
   "changelog": [
+    {
+      "version": "v0.4.0",
+      "zh": "inspect --snapshot 不再冲突：--json -o 现在会写入文件（此前被静默丢弃），默认路径也不再向 stdout 与文件重复输出。JSON 快照的 reached_spans 现在使用规范的 snake_case 键名与字符串枚举，而非原始整数。",
+      "en": "inspect --snapshot no longer collides: --json -o writes the file (was silently dropped) and the default path no longer double-outputs to stdout and file. The JSON snapshot's reached_spans now emit canonical snake_case keys and string enums instead of raw ints."
+    },
     {
       "version": "v0.3.0",
       "zh": "哪怕被攻破的 agent 把调用链改得乱七八糟（断掉或自指的父链接），快照也不会卡死——照样把那一刻的状态给你，而不是一个冻住的终端。",
@@ -19,7 +31,10 @@
     }
   ],
   "hero": {
-    "eyebrow": { "zh": "本地 · 无账号 · 单二进制", "en": "Local · No account · Single binary" },
+    "eyebrow": {
+      "zh": "本地 · 无账号 · 单二进制",
+      "en": "Local · No account · Single binary"
+    },
     "headline": {
       "zh": "Agent 被劫持时\n别杀掉整个运行",
       "en": "When an agent is hijacked,\ndon't kill the whole run"
@@ -29,49 +44,103 @@
       "en": "Freeze the state at the moment of compromise and keep the causal chain that explains how the break-in triggered — one command shows which steps the agent had reached and every tool call it could still reach, with none silently dropped."
     },
     "command": "forkspan inspect trace.json",
-    "cta": { "zh": "查看取证流程", "en": "See the IR flow" },
-    "ctaGithub": { "zh": "GitHub 源码", "en": "GitHub source" },
-    "scroll": { "zh": "往下看", "en": "Scroll" }
+    "cta": {
+      "zh": "查看取证流程",
+      "en": "See the IR flow"
+    },
+    "ctaGithub": {
+      "zh": "GitHub 源码",
+      "en": "GitHub source"
+    },
+    "scroll": {
+      "zh": "往下看",
+      "en": "Scroll"
+    }
   },
   "advantages": [
     {
-      "title": { "zh": "在入侵那一刻冻结状态", "en": "Freeze the state at the moment of compromise" },
+      "title": {
+        "zh": "在入侵那一刻冻结状态",
+        "en": "Freeze the state at the moment of compromise"
+      },
       "body": {
         "zh": "标记被攻破的那一步，导出这一刻的快照：agent 已经走到哪、还能碰到哪些工具调用、以及不透明的内部状态点。能触达的工具调用一条都不漏——因果链不断，事后能做受控实验，而不是只剩推断。",
         "en": "Mark the compromised step and dump the snapshot at that instant: which steps the agent had reached, which tool calls it could still reach, and the opaque internal state checkpoint. Every reachable tool call stays in the set — none silently vanish — so the causal chain stays intact for a controlled experiment later, not just an inference."
       },
-      "chips": ["› 已达步骤树", "› 可达工具调用集", "› 内部状态检查点", "› 乱链也不卡死"]
+      "chips": [
+        "› 已达步骤树",
+        "› 可达工具调用集",
+        "› 内部状态检查点",
+        "› 乱链也不卡死"
+      ]
     },
     {
-      "title": { "zh": "读你 agent 已经在产的标准格式", "en": "Reads the standard format your agents already emit" },
+      "title": {
+        "zh": "读你 agent 已经在产的标准格式",
+        "en": "Reads the standard format your agents already emit"
+      },
       "body": {
         "zh": "直接吃一份标准导出文件，还原成步骤树与工具调用子图。不用改 agent、不用装 collector、不用额外埋点——你已经有的数据就够。",
         "en": "Ingests a standard export file straight into a step tree and tool-call subgraph. No agent changes, no collector to install, no extra instrumentation — the data you already have is enough."
       },
-      "chips": ["› 标准导出文件", "› 纯本地解析", "› 无守护进程"]
+      "chips": [
+        "› 标准导出文件",
+        "› 纯本地解析",
+        "› 无守护进程"
+      ]
     },
     {
-      "title": { "zh": "终端里走查整条因果链", "en": "Walk the whole causal chain in your terminal" },
+      "title": {
+        "zh": "终端里走查整条因果链",
+        "en": "Walk the whole causal chain in your terminal"
+      },
       "body": {
         "zh": "一条命令打开导航器，在步骤树里定位入侵点、翻看前后文。单二进制、零配置、离线可用——取证就该这么直接。",
         "en": "One command opens a navigator to roam the step tree and pin the intrusion in context. Single binary, zero config, fully offline — forensics should be this direct."
       },
-      "chips": ["› 单二进制", "› 零配置", "› 完全离线"]
+      "chips": [
+        "› 单二进制",
+        "› 零配置",
+        "› 完全离线"
+      ]
     },
     {
-      "title": { "zh": "照文档敲的命令，就照文档跑", "en": "The commands in the docs run as documented" },
+      "title": {
+        "zh": "照文档敲的命令，就照文档跑",
+        "en": "The commands in the docs run as documented"
+      },
       "body": {
         "zh": "照着用法页敲的每一条命令都能正常解析并给出回应——已就绪的立刻执行，仍在路线图上的也会指给你下一步在哪，而不是卡在未知参数上报错退出。",
         "en": "Every command in the usage docs parses and responds — the ones already ready execute immediately, and the ones still on the roadmap point you to where they land, instead of dying on an unknown flag."
       },
-      "chips": ["› 照文档即可跑", "› 未就绪也指路"]
+      "chips": [
+        "› 照文档即可跑",
+        "› 未就绪也指路"
+      ]
     }
   ],
-  "scene": { "kind": "mesh" },
-  "cta": {
-    "headline": { "zh": "下一次 agent 失控时，先别 kill", "en": "Next time an agent goes rogue, don't kill it first" },
-    "sub": { "zh": "装上 ForkSpan，在被攻破的那一刻把状态冻下来。", "en": "Install ForkSpan and freeze the state the moment compromise is detected." },
-    "button": { "zh": "go install", "en": "go install" }
+  "scene": {
+    "kind": "mesh"
   },
-  "footer": { "tag": { "zh": "MIT 开源 · 给做事件响应的工程师", "en": "MIT open source · for engineers doing incident response" } }
+  "cta": {
+    "headline": {
+      "zh": "下一次 agent 失控时，先别 kill",
+      "en": "Next time an agent goes rogue, don't kill it first"
+    },
+    "sub": {
+      "zh": "装上 ForkSpan，在被攻破的那一刻把状态冻下来。",
+      "en": "Install ForkSpan and freeze the state the moment compromise is detected."
+    },
+    "button": {
+      "zh": "go install",
+      "en": "go install"
+    }
+  },
+  "footer": {
+    "tag": {
+      "zh": "MIT 开源 · 给做事件响应的工程师",
+      "en": "MIT open source · for engineers doing incident response"
+    }
+  },
+  "generated_at": "2026-08-12T19:47:05Z"
 }
