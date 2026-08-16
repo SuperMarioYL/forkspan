@@ -12,8 +12,13 @@
     "#d4881f",
     "#b36b14"
   ],
-  "content_version": "v0.4.0",
+  "content_version": "v0.5.0",
   "changelog": [
+    {
+      "version": "v0.5.0",
+      "en": "forkspan v0.5.0: fix the stale in-source version so the binary self-reports v0.5.0 (was stuck at v0.3.0 through v0.4.0); refresh en+zh-CN README sample output to the real snake_case reached_spans shape; add `inspect --list` to print the recorded span tree non-interactively so CI/scripts can discover span IDs without the TUI.",
+      "zh": "forkspan v0.5.0：修正二进制自报版本（v0.4.0 发布时仍打印 v0.3.0）；更新 README 示例输出为真实的 snake_case reached_spans 形状；新增 inspect --list 非交互打印 span 树，便于 CI/脚本发现 span ID。"
+    },
     {
       "version": "v0.4.0",
       "zh": "inspect --snapshot 不再冲突：--json -o 现在会写入文件（此前被静默丢弃），默认路径也不再向 stdout 与文件重复输出。JSON 快照的 reached_spans 现在使用规范的 snake_case 键名与字符串枚举，而非原始整数。",
@@ -142,5 +147,5 @@
       "en": "MIT open source · for engineers doing incident response"
     }
   },
-  "generated_at": "2026-08-12T19:47:05Z"
+  "generated_at": "2026-08-16T12:52:22Z"
 }
