@@ -26,7 +26,6 @@ type model struct {
 	flash    string // last action feedback
 	width    int
 	height   int
-	seen     map[string]bool // cycle guard for the DFS flatten (mirrors diff.Subgraph)
 }
 
 var (
@@ -55,34 +54,42 @@ func newModel(tree *ingest.Tree, preMark string) *model {
 	return m
 }
 
-// flatten produces a DFS-preorder list of the tree with indentation depths.
-// A `seen` set guards the DFS against a cyclic ParentID (a malformed /
-// compromised-agent trace) so the navigator never recurses forever.
-func (m *model) flatten() {
-	m.rows = m.rows[:0]
-	m.seen = map[string]bool{}
-	for _, root := range m.tree.Roots() {
-		if m.seen[root] {
+// flattenTree produces a DFS-preorder list of the tree with indentation
+// depths. A `seen` set guards the DFS against a cyclic ParentID (a malformed /
+// compromised-agent trace) so the walk never recurses forever — mirrors
+// diff.Subgraph's cycle guard. Shared by the interactive navigator model and
+// the non-interactive RenderTree helper so the printed tree matches the TUI.
+func flattenTree(tree *ingest.Tree) []node {
+	seen := map[string]bool{}
+	var rows []node
+	var walk func(id string, depth int)
+	walk = func(id string, depth int) {
+		s := tree.Get(id)
+		if s == nil {
+			return
+		}
+		rows = append(rows, node{span: *s, depth: depth})
+		for _, cid := range tree.Children(id) {
+			if seen[cid] {
+				continue
+			}
+			seen[cid] = true
+			walk(cid, depth+1)
+		}
+	}
+	for _, root := range tree.Roots() {
+		if seen[root] {
 			continue
 		}
-		m.seen[root] = true
-		m.walk(root, 0)
+		seen[root] = true
+		walk(root, 0)
 	}
+	return rows
 }
 
-func (m *model) walk(id string, depth int) {
-	s := m.tree.Get(id)
-	if s == nil {
-		return
-	}
-	m.rows = append(m.rows, node{span: *s, depth: depth})
-	for _, cid := range m.tree.Children(id) {
-		if m.seen[cid] {
-			continue
-		}
-		m.seen[cid] = true
-		m.walk(cid, depth+1)
-	}
+// flatten refreshes the model's rows via the shared DFS flatten + cycle guard.
+func (m *model) flatten() {
+	m.rows = flattenTree(m.tree)
 }
 
 // Init is bubbletea's initial command (none).

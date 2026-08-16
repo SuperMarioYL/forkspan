@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "v0.3.0"
+var version = "v0.5.0"
 
 func main() {
 	if err := newRoot().Execute(); err != nil {
@@ -53,6 +53,7 @@ func newInspectCmd() *cobra.Command {
 		snapshotID string
 		asJSON     bool
 		outPath    string
+		listTree   bool
 	)
 	c := &cobra.Command{
 		Use:   "inspect <trace.json>",
@@ -65,6 +66,15 @@ func newInspectCmd() *cobra.Command {
 			}
 			if len(tree.Spans) == 0 {
 				return fmt.Errorf("no spans in %s", args[0])
+			}
+
+			// Non-interactive tree-list path (--list / --print-tree): print the
+			// recorded span tree to stdout and exit 0 WITHOUT launching the
+			// bubbletea TUI, so CI/scripts can discover span IDs (incl. the
+			// pre-marked intrusion span) to feed `inspect -s <id> --json`.
+			if listTree {
+				fmt.Fprint(cmd.OutOrStdout(), tui.RenderTree(tree))
+				return nil
 			}
 
 			// Non-interactive snapshot dump path (the m1 "dump to stdout").
@@ -95,6 +105,8 @@ func newInspectCmd() *cobra.Command {
 	c.Flags().StringVarP(&snapshotID, "snapshot", "s", "", "dump the StateSnapshot at this span id (non-interactive)")
 	c.Flags().BoolVar(&asJSON, "json", false, "emit the snapshot as JSON to stdout (with --snapshot)")
 	c.Flags().StringVarP(&outPath, "out", "o", "", "write the snapshot to this path (default: forkspan-snapshot.json)")
+	c.Flags().BoolVarP(&listTree, "list", "l", false, "print the recorded span tree to stdout (non-interactive) and exit without the TUI")
+	c.Flags().BoolVar(&listTree, "print-tree", false, "alias for --list")
 	return c
 }
 

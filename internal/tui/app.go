@@ -9,6 +9,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/SuperMarioYL/forkspan/internal/diff"
 	"github.com/SuperMarioYL/forkspan/internal/fork"
@@ -49,6 +50,31 @@ func DumpSnapshot(tree *ingest.Tree, atSpanID, path string) ([]byte, error) {
 // non-interactive summary.
 func RenderSubgraph(tree *ingest.Tree, fromSpanID string) string {
 	return diff.RenderSubgraph(diff.Subgraph(tree, fromSpanID))
+}
+
+// RenderTree renders the recorded span tree (DFS preorder, one line per span,
+// indented by depth, with the GenAI role tag, span name, an [intrusion]
+// marker, and the full span id) as a non-interactive string for
+// `inspect --list`. It reuses the same DFS flatten + cycle guard as the
+// navigator model (flattenTree) so the printed tree matches the TUI, and
+// prints the FULL span id (not the truncated short form) so a CI/script can
+// pipe it straight into `inspect -s <id> --json`. Sibling of RenderSubgraph.
+func RenderTree(tree *ingest.Tree) string {
+	if tree == nil {
+		return ""
+	}
+	rows := flattenTree(tree)
+	var b strings.Builder
+	for _, r := range rows {
+		prefix := strings.Repeat("  ", r.depth)
+		line := fmt.Sprintf("%s%s  %s", prefix, roleTag(r.span.Role), r.span.Name)
+		if r.span.Intrusion {
+			line += "  [intrusion]"
+		}
+		line += "  " + r.span.SpanID
+		b.WriteString(line + "\n")
+	}
+	return b.String()
 }
 
 // runProgram launches the bubbletea program for the navigator model.

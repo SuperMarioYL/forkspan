@@ -72,8 +72,8 @@ go build -o forkspan ./cmd/forkspan
 
 ```
 {"at_span_id":"0a0b0c0d0e0f0a0b","reached_spans":[
-  {"SpanID":"0102030405060708","Name":"agent.invoke","Role":"Agent",...},
-  {"SpanID":"0a0b0c0d0e0f0a0b","Name":"llm.chat","Role":"LLM","Intrusion":true,...}],
+  {"span_id":"0102030405060708","name":"agent.invoke","role":"Agent","kind":"SPAN_KIND_INTERNAL","status":{"code":"STATUS_CODE_OK","message":""},"intrusion":false,...},
+  {"span_id":"0a0b0c0d0e0f0a0b","name":"llm.chat","role":"LLM","kind":"SPAN_KIND_INTERNAL","status":{"code":"STATUS_CODE_OK","message":""},"intrusion":true,...}],
  "reachable_tool_calls":["1112131415161718","2122232425262728"],
  "agent_state":{...}}
 ```
@@ -88,10 +88,13 @@ go build -o forkspan ./cmd/forkspan
 ./forkspan inspect trace.json
 #   j/k 导航 · m 标记入侵 · s fork StateSnapshot → forkspan-snapshot.json · q 退出
 
-# 2. 非交互式快照导出到 stdout（CI / 脚本友好）。
+# 2. 非交互式打印已记录的 span 树以发现 span ID（CI / 脚本友好）。
+./forkspan inspect trace.json --list
+
+# 3. 非交互式快照导出到 stdout（从 --list 管道传入 span id）。
 ./forkspan inspect trace.json -s <spanId> --json > snapshot.json
 
-# 3. 反事实 fork + 回放（m2 里程碑——v0.1 打印路线图指针）。
+# 4. 反事实 fork + 回放（m2 里程碑——v0.1 打印路线图指针）。
 ./forkspan fork --span <spanId> --block-tool bash
 ./forkspan replay --branch <id>
 ```
