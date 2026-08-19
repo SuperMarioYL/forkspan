@@ -12,8 +12,13 @@
     "#d4881f",
     "#b36b14"
   ],
-  "content_version": "v0.5.0",
+  "content_version": "v0.6.0",
   "changelog": [
+    {
+      "version": "v0.6.0",
+      "en": "forkspan v0.6.0: orphan spans — whose parent is missing from a partial export (common with partial collector grabs of a compromised-agent run) — no longer vanish from the navigator and `inspect --list`. Tree.Roots() now treats a span with an absent parent as a root, so every span (incl. a pre-marked intrusion span) stays discoverable. Behavior-preserving for well-formed traces.",
+      "zh": "forkspan v0.6.0：父 span 缺失的孤儿 span（被攻破 agent 运行的部分导出里常见）不再从导航器和 `inspect --list` 中消失。Tree.Roots() 现在把父 span 不在导出里的 span 也当作根，这样每条 span（含预标记的入侵 span）都能被发现。对结构完整的 trace 行为不变。"
+    },
     {
       "version": "v0.5.0",
       "en": "forkspan v0.5.0: fix the stale in-source version so the binary self-reports v0.5.0 (was stuck at v0.3.0 through v0.4.0); refresh en+zh-CN README sample output to the real snake_case reached_spans shape; add `inspect --list` to print the recorded span tree non-interactively so CI/scripts can discover span IDs without the TUI.",
@@ -147,5 +152,5 @@
       "en": "MIT open source · for engineers doing incident response"
     }
   },
-  "generated_at": "2026-08-16T12:52:22Z"
+  "generated_at": "2026-08-19T05:19:07Z"
 }

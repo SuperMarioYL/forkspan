@@ -84,12 +84,14 @@ func (t *Tree) Get(id string) *Span { return t.byID[id] }
 // Children returns the child span IDs of parentID in start order.
 func (t *Tree) Children(parentID string) []string { return t.children[parentID] }
 
-// Roots returns root span IDs: spans whose ParentID is empty.
+// Roots returns root span IDs: spans whose ParentID is empty OR whose parent is
+// absent from the export (orphan spans — OTLP-spec-allowed for partial collector
+// grabs), so the navigator and `inspect --list` never silently drop them.
 func (t *Tree) Roots() []string {
 	seen := map[string]bool{}
 	var roots []string
 	for _, s := range t.Spans {
-		if s.ParentID == "" && !seen[s.SpanID] {
+		if (s.ParentID == "" || t.Get(s.ParentID) == nil) && !seen[s.SpanID] {
 			roots = append(roots, s.SpanID)
 			seen[s.SpanID] = true
 		}
@@ -133,7 +135,7 @@ type otlpEnvelope struct {
 }
 
 type otlpResourceSpans struct {
-	Resource  *otlpResource   `json:"resource,omitempty"`
+	Resource   *otlpResource    `json:"resource,omitempty"`
 	ScopeSpans []otlpScopeSpans `json:"scopeSpans"`
 }
 
@@ -142,7 +144,7 @@ type otlpResource struct {
 }
 
 type otlpScopeSpans struct {
-	Scope *otlpScope `json:"scope,omitempty"`
+	Scope *otlpScope     `json:"scope,omitempty"`
 	Spans []otlpSpanJSON `json:"spans"`
 }
 
@@ -152,15 +154,15 @@ type otlpScope struct {
 }
 
 type otlpSpanJSON struct {
-	TraceID            string         `json:"traceId"`
-	SpanID             string         `json:"spanId"`
-	ParentSpanID       string         `json:"parentSpanId"`
-	Name               string         `json:"name"`
-	Kind               string         `json:"kind"`
-	StartTimeUnixNano  string         `json:"startTimeUnixNano"`
-	EndTimeUnixNano    string         `json:"endTimeUnixNano"`
-	Attributes         []otlpKeyValue  `json:"attributes"`
-	Status             *otlpStatusJSON `json:"status"`
+	TraceID           string          `json:"traceId"`
+	SpanID            string          `json:"spanId"`
+	ParentSpanID      string          `json:"parentSpanId"`
+	Name              string          `json:"name"`
+	Kind              string          `json:"kind"`
+	StartTimeUnixNano string          `json:"startTimeUnixNano"`
+	EndTimeUnixNano   string          `json:"endTimeUnixNano"`
+	Attributes        []otlpKeyValue  `json:"attributes"`
+	Status            *otlpStatusJSON `json:"status"`
 }
 
 type otlpStatusJSON struct {
@@ -169,8 +171,8 @@ type otlpStatusJSON struct {
 }
 
 type otlpKeyValue struct {
-	Key   string        `json:"key"`
-	Value otlpAnyJSON   `json:"value"`
+	Key   string      `json:"key"`
+	Value otlpAnyJSON `json:"value"`
 }
 
 // otlpAnyJSON mirrors the OTLP AnyValue oneof. proto3 JSON encodes int64 as a

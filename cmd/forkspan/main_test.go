@@ -150,19 +150,19 @@ func readmeAbs(t *testing.T, name string) string {
 }
 
 // TestVersion_VarIsTarget is the regression test for fix-version-stale: the
-// in-source `version` package var must equal "v0.5.0" so a binary built at the
-// v0.5.0 tag self-reports v0.5.0 (was stuck at "v0.3.0" through the v0.4.0
-// release). Red on the current source (var is "v0.3.0"), green post-bump.
+// in-source `version` package var must equal the VERSION file's target so a
+// binary built at the v0.6.0 tag self-reports v0.6.0 (was stuck at "v0.3.0"
+// through the v0.4.0 release; v0.5.0 first bumped it to match). Red if the var
+// drifts from the VERSION file, green while they agree.
 func TestVersion_VarIsTarget(t *testing.T) {
-	if version != "v0.5.0" {
-		t.Errorf("version var = %q, want %q (the v0.4.0 release shipped a binary self-reporting v0.3.0)", version, "v0.5.0")
+	if version != "v0.6.0" {
+		t.Errorf("version var = %q, want %q (must match the v0.6.0 release tag / VERSION file)", version, "v0.6.0")
 	}
 }
 
 // TestVersion_FlagPrintsTarget is the regression test for fix-version-stale
-// (flag half): `forkspan --version` must write a stdout line containing
-// "v0.5.0". Red on the current source (cobra prints "... version v0.3.0"),
-// green post-bump.
+// (flag half): `forkspan --version` must write a stdout line containing the
+// current release tag "v0.6.0". Red on a drifted var, green while they agree.
 func TestVersion_FlagPrintsTarget(t *testing.T) {
 	var stdout bytes.Buffer
 	root := newRoot()
@@ -177,8 +177,8 @@ func TestVersion_FlagPrintsTarget(t *testing.T) {
 			t.Fatalf("--version: %v", err)
 		}
 	}
-	if !strings.Contains(stdout.String(), "v0.5.0") {
-		t.Errorf("--version stdout = %q, want a line containing v0.5.0", stdout.String())
+	if !strings.Contains(stdout.String(), "v0.6.0") {
+		t.Errorf("--version stdout = %q, want a line containing v0.6.0", stdout.String())
 	}
 }
 
