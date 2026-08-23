@@ -12,7 +12,7 @@
     "#d4881f",
     "#b36b14"
   ],
-  "content_version": "v0.6.0",
+  "content_version": "v0.7.0",
   "changelog": [
     {
       "version": "v0.6.0",
@@ -38,6 +38,11 @@
       "version": "v0.2.0",
       "zh": "照文档敲的 fork/replay 命令现在能正常解析并指路，不再报未知参数；工具调用不再被误判漏掉，能触达的工具一条都不漏。",
       "en": "Documented fork/replay invocations now parse and point the way instead of erroring on unknown flags; tool spans are no longer misclassified, so every reachable tool stays in the set."
+    },
+    {
+      "version": "v0.7.0",
+      "date": "2026-08-24",
+      "note": "refresh: content re-verified for v0.7.0 (fix-snapshot-payload-base64 — the inspect --json snapshot now emits the readable trigger payload, reinforcing the hero pitch). No content change; CI rebuild."
     }
   ],
   "hero": {
@@ -152,5 +157,5 @@
       "en": "MIT open source · for engineers doing incident response"
     }
   },
-  "generated_at": "2026-08-19T05:19:07Z"
+  "generated_at": "2026-08-23T18:34:40Z"
 }
