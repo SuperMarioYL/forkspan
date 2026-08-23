@@ -156,8 +156,8 @@ type Span struct {
 	ToolName string     `json:"tool_name"`
 	Role     GenAIRole  `json:"role"`
 	Attrs    []KeyValue `json:"attrs"`
-	Input    []byte     `json:"input"`
-	Output   []byte     `json:"output"`
+	Input    string     `json:"input"`
+	Output   string     `json:"output"`
 	Start    time.Time  `json:"start"`
 	End      time.Time  `json:"end"`
 	Status   Status     `json:"status"`

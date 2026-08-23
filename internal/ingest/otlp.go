@@ -240,13 +240,13 @@ func convertSpanJSON(sp otlpSpanJSON) Span {
 		}
 	}
 
-	s.Input = []byte(s.AttrString("gen_ai.request.content"))
+	s.Input = s.AttrString("gen_ai.request.content")
 	if len(s.Input) == 0 {
-		s.Input = []byte(s.AttrString("gen_ai.tool.input"))
+		s.Input = s.AttrString("gen_ai.tool.input")
 	}
-	s.Output = []byte(s.AttrString("gen_ai.response.content"))
+	s.Output = s.AttrString("gen_ai.response.content")
 	if len(s.Output) == 0 {
-		s.Output = []byte(s.AttrString("gen_ai.tool.output"))
+		s.Output = s.AttrString("gen_ai.tool.output")
 	}
 
 	if sp.Status != nil {
@@ -383,13 +383,13 @@ func convertSpanProto(sp *otlp.Span) Span {
 			s.ToolName = s.AttrString("gen_ai.tool.name")
 		}
 	}
-	s.Input = []byte(s.AttrString("gen_ai.request.content"))
+	s.Input = s.AttrString("gen_ai.request.content")
 	if len(s.Input) == 0 {
-		s.Input = []byte(s.AttrString("gen_ai.tool.input"))
+		s.Input = s.AttrString("gen_ai.tool.input")
 	}
-	s.Output = []byte(s.AttrString("gen_ai.response.content"))
+	s.Output = s.AttrString("gen_ai.response.content")
 	if len(s.Output) == 0 {
-		s.Output = []byte(s.AttrString("gen_ai.tool.output"))
+		s.Output = s.AttrString("gen_ai.tool.output")
 	}
 	if sp.Status != nil {
 		s.Status = Status{Code: statusCodeFromProto(sp.Status.Code), Message: sp.Status.Message}
