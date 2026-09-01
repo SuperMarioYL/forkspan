@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -136,6 +137,19 @@ func versionFileAbs(t *testing.T) string {
 	return abs
 }
 
+// versionFromFile reads the canonical VERSION file and returns its trimmed
+// content. The version tests compare against this instead of a hardcoded
+// release literal so they never drift on the next bump — the VERSION file is
+// the single source of truth they already claim it is.
+func versionFromFile(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(versionFileAbs(t))
+	if err != nil {
+		t.Fatalf("read VERSION: %v", err)
+	}
+	return strings.TrimSpace(string(raw))
+}
+
 // readmeAbs resolves a repo-root README to an absolute path (cmd/forkspan cwd).
 func readmeAbs(t *testing.T, name string) string {
 	t.Helper()
@@ -149,21 +163,28 @@ func readmeAbs(t *testing.T, name string) string {
 	return abs
 }
 
-// TestVersion_VarIsTarget is the regression test for fix-version-stale: the
-// in-source `version` package var must equal the VERSION file's target so a
-// binary built at the v0.6.0 tag self-reports v0.6.0 (was stuck at "v0.3.0"
-// through the v0.4.0 release; v0.5.0 first bumped it to match). Red if the var
-// drifts from the VERSION file, green while they agree.
+// TestVersion_VarIsTarget is the regression test for fix-version-stale /
+// fix-version-drift-v070: the in-source `version` package var must equal the
+// VERSION file (the canonical release tag) so a binary built at the v0.8.0 tag
+// self-reports v0.8.0. The expected value is DERIVED from the VERSION file
+// (not a hardcoded literal) so this test never drifts on the next bump — it
+// was the hardcoded "v0.6.0" literal that let the v0.7.0 bump skip the var and
+// ship a binary self-reporting v0.6.0. Red if the var drifts from VERSION,
+// green while they agree.
 func TestVersion_VarIsTarget(t *testing.T) {
-	if version != "v0.6.0" {
-		t.Errorf("version var = %q, want %q (must match the v0.6.0 release tag / VERSION file)", version, "v0.6.0")
+	want := versionFromFile(t)
+	if version != want {
+		t.Errorf("version var = %q, want %q (must match the VERSION file — the canonical release tag)", version, want)
 	}
 }
 
-// TestVersion_FlagPrintsTarget is the regression test for fix-version-stale
-// (flag half): `forkspan --version` must write a stdout line containing the
-// current release tag "v0.6.0". Red on a drifted var, green while they agree.
+// TestVersion_FlagPrintsTarget is the regression test for fix-version-stale /
+// fix-version-drift-v070 (flag half): `forkspan --version` must write a stdout
+// line containing the VERSION file's release tag. The expected value is DERIVED
+// from the VERSION file (not a hardcoded literal) so this test never drifts on
+// the next bump. Red on a drifted var, green while they agree.
 func TestVersion_FlagPrintsTarget(t *testing.T) {
+	want := versionFromFile(t)
 	var stdout bytes.Buffer
 	root := newRoot()
 	root.SetArgs([]string{"--version"})
@@ -177,8 +198,8 @@ func TestVersion_FlagPrintsTarget(t *testing.T) {
 			t.Fatalf("--version: %v", err)
 		}
 	}
-	if !strings.Contains(stdout.String(), "v0.6.0") {
-		t.Errorf("--version stdout = %q, want a line containing v0.6.0", stdout.String())
+	if !strings.Contains(stdout.String(), want) {
+		t.Errorf("--version stdout = %q, want a line containing %s (the VERSION file)", stdout.String(), want)
 	}
 }
 
@@ -195,6 +216,34 @@ func TestVersion_VersionFileSingleSourceOfTruth(t *testing.T) {
 	got := strings.TrimSpace(string(raw))
 	if got != version {
 		t.Errorf("VERSION file = %q, want %q (version var); bump both together", got, version)
+	}
+}
+
+// TestVersion_SiteJSONInLockstep is the guard pin for fix-version-drift-v070:
+// web/site.json's content_version must equal the canonical VERSION file so the
+// live site (forkspan.lei6393.com) never advertises a stale version while the
+// repo ships a newer tag. This is the guard that was MISSING and let the v0.7.0
+// ship leave the site at v0.6.0 (the VERSION file was bumped to v0.7.0 but
+// site.json was not). Red if a future bump touches VERSION without site.json,
+// green while they agree.
+func TestVersion_SiteJSONInLockstep(t *testing.T) {
+	abs, err := filepath.Abs("../../web/site.json")
+	if err != nil {
+		t.Fatalf("resolve web/site.json: %v", err)
+	}
+	raw, err := os.ReadFile(abs)
+	if err != nil {
+		t.Fatalf("read web/site.json: %v", err)
+	}
+	var sj struct {
+		ContentVersion string `json:"content_version"`
+	}
+	if err := json.Unmarshal(raw, &sj); err != nil {
+		t.Fatalf("parse web/site.json content_version: %v", err)
+	}
+	want := versionFromFile(t)
+	if sj.ContentVersion != want {
+		t.Errorf("web/site.json content_version = %q, want %q (VERSION file); bump both together", sj.ContentVersion, want)
 	}
 }
 

@@ -12,8 +12,13 @@
     "#d4881f",
     "#b36b14"
   ],
-  "content_version": "v0.7.0",
+  "content_version": "v0.8.0",
   "changelog": [
+    {
+      "version": "v0.8.0",
+      "en": "forkspan v0.8.0: fix version-surface drift — the in-source version var (stuck at v0.6.0 through v0.7.0) and the live-site content_version now stay in lockstep with the VERSION file, and the v0.7.0 release's red CI test suite is green again. `forkspan --version` self-reports the true tag; a new guard test pins site.json to the canonical VERSION so the drift cannot recur. No product-logic change.",
+      "zh": "forkspan v0.8.0：修复版本面漂移——源码内版本常量（v0.7.0 发布时仍停在 v0.6.0）与官网 content_version 现与 VERSION 文件保持一致，v0.7.0 发布时变红的 CI 测试套件重新转绿。`forkspan --version` 现正确自报版本；新增守卫测试把 site.json 钉到权威 VERSION，杜绝再次漂移。无产品逻辑变更。"
+    },
     {
       "version": "v0.6.0",
       "en": "forkspan v0.6.0: orphan spans — whose parent is missing from a partial export (common with partial collector grabs of a compromised-agent run) — no longer vanish from the navigator and `inspect --list`. Tree.Roots() now treats a span with an absent parent as a root, so every span (incl. a pre-marked intrusion span) stays discoverable. Behavior-preserving for well-formed traces.",
