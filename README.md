@@ -92,6 +92,25 @@ go run ./cmd/forkspan inspect assets/sample-compromised-trace.json -s 0a0b0c0d0e
 go run ./cmd/forkspan inspect assets/sample-compromised-trace.json
 ```
 
+### Inspect the snapshot JSON
+
+The selected span has two reached spans (the root and the selected LLM span) and two downstream tool-call IDs. With Python 3, this command projects the relevant fields from the real JSON output; the full snapshot also contains attributes, timing and agent state.
+
+```bash
+go run ./cmd/forkspan inspect assets/sample-compromised-trace.json \
+  -s 0a0b0c0d0e0f0a0b --json | python3 -c '
+import json, sys
+s = json.load(sys.stdin)
+print(json.dumps({"at_span_id": s["at_span_id"], "reached_spans": [
+    {k: span[k] for k in ("span_id", "name", "role", "intrusion")}
+    for span in s["reached_spans"]
+], "reachable_tool_calls": s["reachable_tool_calls"]}, separators=(",", ":")))'
+```
+
+```json
+{"at_span_id":"0a0b0c0d0e0f0a0b","reached_spans":[{"span_id":"0102030405060708","name":"agent.invoke","role":"Agent","intrusion":false},{"span_id":"0a0b0c0d0e0f0a0b","name":"llm.chat","role":"LLM","intrusion":true}],"reachable_tool_calls":["1112131415161718","2122232425262728"]}
+```
+
 ## Configuration
 
 --list prints the recorded tree without opening a TUI. --snapshot/-s selects a span. --json writes the snapshot to stdout; --out/-o also selects a file destination. In the TUI use j/k to navigate, m to mark, s to save, and q to quit.

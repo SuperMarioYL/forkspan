@@ -92,6 +92,25 @@ go run ./cmd/forkspan inspect assets/sample-compromised-trace.json -s 0a0b0c0d0e
 go run ./cmd/forkspan inspect assets/sample-compromised-trace.json
 ```
 
+### 检查快照 JSON
+
+选定 Span 的快照包含两个已到达 Span（根节点与选定的 LLM 节点），以及两个下游工具调用 ID。下面使用 Python 3 从真实 JSON 输出提取相关字段；完整快照还包含属性、时序与 Agent 状态。
+
+```bash
+go run ./cmd/forkspan inspect assets/sample-compromised-trace.json \
+  -s 0a0b0c0d0e0f0a0b --json | python3 -c '
+import json, sys
+s = json.load(sys.stdin)
+print(json.dumps({"at_span_id": s["at_span_id"], "reached_spans": [
+    {k: span[k] for k in ("span_id", "name", "role", "intrusion")}
+    for span in s["reached_spans"]
+], "reachable_tool_calls": s["reachable_tool_calls"]}, separators=(",", ":")))'
+```
+
+```json
+{"at_span_id":"0a0b0c0d0e0f0a0b","reached_spans":[{"span_id":"0102030405060708","name":"agent.invoke","role":"Agent","intrusion":false},{"span_id":"0a0b0c0d0e0f0a0b","name":"llm.chat","role":"LLM","intrusion":true}],"reachable_tool_calls":["1112131415161718","2122232425262728"]}
+```
+
 ## 配置
 
 --list 无需 TUI 即可打印树；--snapshot/-s 选择 Span。--json 将快照写到标准输出，--out/-o 可指定文件。在 TUI 中使用 j/k 移动、m 标记、s 保存、q 退出。
