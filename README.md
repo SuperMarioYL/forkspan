@@ -1,145 +1,127 @@
-<div align="right"><sub><b>EN</b>&nbsp;&nbsp;⇄&nbsp;&nbsp;<a href="./README.zh-CN.md">中文</a></sub></div>
+[简体中文](./README.zh-CN.md) · [Website](https://forkspan.lei6393.com) · [GitHub](https://github.com/SuperMarioYL/forkspan)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/hero-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/hero-light.svg">
-  <img src="./assets/hero-light.svg" width="880" alt="ForkSpan — Fork an agent run compromised mid-run">
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/hero-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/hero-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/hero-dark.svg">
+  <img src="./assets/presentation/hero-light.svg" width="960" alt="Hero diagram">
 </picture>
 
-<p align="center"><sub>ForkSpan is the fork primitive that counterfactually replays compromised agent runs for IR engineers.</sub></p>
+# forkspan
 
-**Stop killing the run and losing the causal chain — fork the recorded state at the intrusion span and replay counterfactual branches to localize the trigger payload.**
+**Inspect an agent trace at the point that matters.**
 
-<p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/github/license/SuperMarioYL/forkspan?color=blue" alt="license"></a>
-  &nbsp;<a href="https://github.com/SuperMarioYL/forkspan/releases"><img src="https://img.shields.io/github/v/release/SuperMarioYL/forkspan" alt="latest release"></a>
-  &nbsp;<a href="https://github.com/SuperMarioYL/forkspan/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SuperMarioYL/forkspan/ci.yml?branch=main&label=ci" alt="CI"></a>
-  &nbsp;<img src="https://img.shields.io/badge/Go-1.24-00ADD8?logo=go" alt="Go 1.24">
-  &nbsp;<img src="https://img.shields.io/badge/Agent-fork%20primitive-5E5CE6" alt="Agent — fork primitive">
-</p>
+ForkSpan loads recorded OTLP GenAI spans into a navigable tree and exports a StateSnapshot at a selected span.
 
-## Table of Contents
+## Why use it
 
-- [Why this exists](#why-this-exists)
-- [Architecture](#architecture)
-- [Install](#install)
-- [Quickstart](#quickstart)
-- [Usage](#usage)
-- [Demo](#demo)
-- [Roadmap](#roadmap)
-- [License](#license)
+A suspicious tool call is easier to investigate when its parent spans and reachable downstream calls stay visible. ForkSpan turns a trace export into a local inspection surface with a scriptable snapshot path.
 
-## Why this exists
+- **Inspect a selected span** — Export the recorded state at an explicit ID.
+- **Use a terminal or scripts** — TUI navigation and JSON output share the same trace model.
+- **Keep the trace local** — Inspection needs no model call or remote service.
 
-When an autonomous agent is subverted mid-run (prompt injection, tool-call hijack, policy escape), the only safe action today is to kill the run — which severs the causal chain that would explain *how* the subversion triggered. The IR loop is left with a read-only timeline and an inference, never a controlled experiment. ForkSpan makes "fork the recorded state at span X and replay counterfactuals" a first-class primitive operated over OTel-GenAI spans, so an operator can *prove* which payload drove the subversion instead of arguing it. The OTel-GenAI span standard is the unlock: a common span unit at which state can be snapshotted and across which branch diffs are machine-checkable. This is the agentic forensic primitive that the [affaan-m/ECC](https://github.com/affaan-m/ECC) agent-runtime orbit has been missing — closest analog is [langgenius/dify](https://github.com/langgenius/dify) for agent flows, but none forks counterfactual branches over recorded spans.
-
-> **Honesty seam:** v0.1 projects counterfactuals *structurally* over recorded spans — it does not re-run the LLM. Every uncertain divergence is flagged via `NeedsReExec` rather than silently claimed. Live re-execution is post-v0.1.
-
-<h2><img src="https://api.iconify.design/tabler:topology-star-3.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Architecture</h2>
+## Architecture
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/atlas-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/atlas-light.svg">
-  <img src="./assets/atlas-light.svg" width="880" alt="Architecture: OTLP-GenAI spans → ingest span tree → fork StateSnapshot → tui navigator">
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/architecture-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/architecture-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/architecture-dark.svg">
+  <img src="./assets/presentation/architecture-light.svg" width="960" alt="Architecture diagram">
 </picture>
 
-Single binary, three layers, no daemons, no network in v0.1. Ingest is a pure JSON parse (no OTLP collector, no live tail). Fork and diff are pure functions over the span tree. The TUI is the only interactive surface — one process, one binary, one config-free command for the demo.
+ingest parses the OTLP export and builds the span relationships. The TUI renders the tree, and snapshot capture collects the recorded state at the selected ID. The current fork and replay commands are roadmap placeholders; no counterfactual execution is performed.
 
-<h2><img src="https://api.iconify.design/tabler:download.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Install</h2>
+| Component | Responsibility |
+| --- | --- |
+| `OTLP JSON` | internal/ingest/otlp.go |
+| `Span tree` | internal/ingest/model.go |
+| `Snapshot` | internal/fork/snapshot.go |
+| `TUI / JSON` | internal/tui |
 
-```bash
-go install github.com/SuperMarioYL/forkspan/cmd/forkspan@latest
-```
+## Install and quickstart
 
-Or build from source:
-
-```bash
-git clone https://github.com/SuperMarioYL/forkspan
-cd forkspan && go build -o forkspan ./cmd/forkspan
-```
-
-Requires Go 1.24+. macOS/Linux primary (TUI/tty); Windows is best-effort.
-
-<h2><img src="https://api.iconify.design/tabler:rocket.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Quickstart</h2>
+Build with the version declared in the repository manifest. Run the example from the repository root.
 
 ```bash
-go build -o forkspan ./cmd/forkspan
-./forkspan inspect assets/sample-compromised-trace.json            # open the navigator on the bundled compromised-agent trace
-./forkspan inspect assets/sample-compromised-trace.json -s 0a0b0c0d0e0f0a0b --json   # dump the StateSnapshot at the intrusion span
+git clone https://github.com/SuperMarioYL/forkspan.git
+cd forkspan
+go build ./cmd/forkspan
 ```
 
-<details><summary>sample output</summary>
-
-```
-{"at_span_id":"0a0b0c0d0e0f0a0b","reached_spans":[
-  {"span_id":"0102030405060708","name":"agent.invoke","role":"Agent","kind":"SPAN_KIND_INTERNAL","status":{"code":"STATUS_CODE_OK","message":""},"intrusion":false,...},
-  {"span_id":"0a0b0c0d0e0f0a0b","name":"llm.chat","role":"LLM","kind":"SPAN_KIND_INTERNAL","status":{"code":"STATUS_CODE_OK","message":""},"intrusion":true,...}],
- "reachable_tool_calls":["1112131415161718","2122232425262728"],
- "agent_state":{...}}
-```
-</details>
-
-<h2><img src="https://api.iconify.design/tabler:terminal-2.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Usage</h2>
-
-The three subcommands are `inspect` (m1, implemented), `fork` and `replay` (m2/m3, roadmap pointer).
+List the complete synthetic compromised-agent trace included in assets/sample-compromised-trace.json.
 
 ```bash
-# 1. Navigate the recorded span tree, mark the intrusion span, fork the StateSnapshot.
-./forkspan inspect trace.json
-#   j/k navigate · m mark intrusion · s fork StateSnapshot → forkspan-snapshot.json · q quit
-
-# 2. Print the recorded span tree non-interactively to discover span IDs (CI / scripting friendly).
-./forkspan inspect trace.json --list
-
-# 3. Non-interactive snapshot dump to stdout (pipe a span id from --list).
-./forkspan inspect trace.json -s <spanId> --json > snapshot.json
-
-# 4. Counterfactual fork + replay (m2 milestone — prints a roadmap pointer in v0.1).
-./forkspan fork --span <spanId> --block-tool bash
-./forkspan replay --branch <id>
+go run ./cmd/forkspan inspect assets/sample-compromised-trace.json --list
 ```
 
-The bundled `assets/sample-compromised-trace.json` is a synthetic HF-incident-style trace: an `agent.invoke` run where a prompt-injection payload in an `llm.chat` span (pre-marked `forkspan.intrusion=true`) drove two exfiltration tool calls (`bash` → `http`). The intrusion span's reachable tool-call set is exactly those two exfil calls — the blast radius the counterfactual (m2) would project + diff.
+## Recorded demo
 
-<h2><img src="https://api.iconify.design/tabler:photo.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Demo</h2>
+<picture>
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/process-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/process-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/process-dark.svg">
+  <img src="./assets/presentation/process-light.svg" width="960" alt="Process diagram">
+</picture>
 
-![demo](assets/demo.gif)
+The recorded tree exposes the marked intrusion span and its downstream tool-call spans.
 
-The flow above is scripted in [`docs/demo.tape`](./docs/demo.tape) and re-rendered by the `demo` workflow on demand; the committed `assets/demo.gif` is the source of truth. The m1 milestone runs the inspect + snapshot-dump path end to end on the bundled trace.
+```text
+[Agent]  agent.invoke  0102030405060708
+  [LLM]    llm.chat  [intrusion]  0a0b0c0d0e0f0a0b
+    [Tool]   tool.call.bash  1112131415161718
+    [Tool]   tool.call.http  2122232425262728
+  [LLM]    llm.chat  3132333435363738
+    [Tool]   tool.call.search  4142434445464748
+```
 
-<h2><img src="https://api.iconify.design/tabler:map-2.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Roadmap</h2>
+The complete command and output are recorded in [docs/demo-results.json](./docs/demo-results.json). Inputs and reproduction code are included in the repository.
 
-- [x] **m1 — ingest + navigate.** Parse an OTLP-GenAI JSON export into a span tree + tool-call subgraph; TUI navigator marks any span as the intrusion span and dumps the `StateSnapshot`.
-- [ ] **m2 — fork + diff.** Snapshot state at the marked span, apply a counterfactual mutation (block tool / redact payload / harden policy), project the downstream tool-call subgraph, and render side-by-side recorded-vs-counterfactual diff with `NeedsReExec` flags.
-- [ ] **m3 — polish + demo.** Bundled sample compromised-agent trace, asciinema cast, one-shot `forkspan demo` reproducing the full fork/inspect/replay flow in under 2 minutes.
-- [ ] **post-v0.1 — live re-exec.** Deterministic agent replay over snapshotted state to confirm uncertain divergences (closes the `NeedsReExec` seam).
+![Existing terminal recording](./assets/demo.gif)
 
-### ForkSpan vs. adjacent tooling
+The existing recording is retained for context; the text example above documents the reproducible scenario.
 
-| Axis | ForkSpan | [affaan-m/ECC](https://github.com/affaan-m/ECC) |
-|---|---|---|
-| Counterfactual fork at a span | ✓ | — |
-| Recorded-state snapshot (no re-run) | ✓ | — |
-| OTel-GenAI span consumer | ✓ | partial |
-| Live eval / re-execution harness | partial (`NeedsReExec`) | ✓ |
-| Intrusion-forensics focus | ✓ | — |
+## Usage
 
-ECC is the broader agent-runtime/eval reference; ForkSpan is complementary — a forensic consumer of the spans those runtimes already collect, not a competitor.
-
-<h2><img src="https://api.iconify.design/tabler:license.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> License</h2>
-
-MIT — see [LICENSE](./LICENSE). Issues and PRs welcome; file an issue with a redacted compromised-agent trace to reproduce the fork flow on real data.
-
-After pushing, set the repo topics so the forensic audience finds it:
+The CLI exposes the following operations. Commands after the example use your own paths or identifiers.
 
 ```bash
-gh repo edit --add-topic agent --add-topic otel --add-topic opentelemetry --add-topic forensics --add-topic llm-agents --add-topic tracing
+go run ./cmd/forkspan inspect assets/sample-compromised-trace.json --list
+go run ./cmd/forkspan inspect assets/sample-compromised-trace.json -s 0a0b0c0d0e0f0a0b --json
+# Interactive navigation requires a terminal:
+go run ./cmd/forkspan inspect assets/sample-compromised-trace.json
 ```
 
-## Share this
+## Configuration
 
-```
-ForkSpan — the Agent fork primitive for compromised agent runs. Snapshot the recorded state at the intrusion span over OTel-GenAI spans, replay counterfactuals to localize the trigger payload without killing the run. https://github.com/SuperMarioYL/forkspan
-```
+--list prints the recorded tree without opening a TUI. --snapshot/-s selects a span. --json writes the snapshot to stdout; --out/-o also selects a file destination. In the TUI use j/k to navigate, m to mark, s to save, and q to quit.
 
-<p align="center"><sub><a href="./LICENSE">MIT</a> © 2026 SuperMarioYL</sub></p>
+## Integrations and responsibilities
+
+<picture>
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/integrations-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/integrations-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/integrations-dark.svg">
+  <img src="./assets/presentation/integrations-light.svg" width="960" alt="Integrations diagram">
+</picture>
+
+The following routes are implemented in the source. Choose the input that matches your task and keep the resulting artifact with your project.
+
+| Route | Implemented role |
+| --- | --- |
+| OTLP JSON | Recorded GenAI spans |
+| Terminal TUI | Navigate and mark spans |
+| StateSnapshot JSON | Scriptable state export |
+| Span IDs | Non-interactive tree listing |
+
+## Limits and next steps
+
+- fork and replay are not implemented; their current commands print roadmap guidance.
+- Recorded reachability is not proof of causal responsibility. No model or tool is re-executed.
+- The bundled compromised trace is synthetic and contains no live incident data.
+
+Counterfactual projection, branch diffs and live replay are future work. The implemented workflow is trace inspection and recorded-state export.
+
+## License and contributions
+
+See [LICENSE](./LICENSE). When reporting an issue, include a minimal input, the command, and the observed output.

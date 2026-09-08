@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "source_revision": "490386cd7834cc8109331e673e18d19c54db04b9",
+  "scope": "Read-only navigation of the shipped synthetic OTLP trace; no live agent execution or counterfactual replay.",
+  "steps": [
+    {
+      "label": "Recorded run",
+      "body": "Read-only navigation of the shipped synthetic OTLP trace; no live agent execution or counterfactual replay.",
+      "command": "go run ./cmd/forkspan inspect assets/sample-compromised-trace.json --list",
+      "output": "[Agent]  agent.invoke  0102030405060708\n  [LLM]    llm.chat  [intrusion]  0a0b0c0d0e0f0a0b\n    [Tool]   tool.call.bash  1112131415161718\n    [Tool]   tool.call.http  2122232425262728\n  [LLM]    llm.chat  3132333435363738\n    [Tool]   tool.call.search  4142434445464748"
+    }
+  ]
+}

@@ -1,145 +1,127 @@
-<div align="right"><sub><a href="./README.md">English</a>&nbsp;&nbsp;⇄&nbsp;&nbsp;<b>简体中文</b></sub></div>
+[English](./README.md) · [Website](https://forkspan.lei6393.com) · [GitHub](https://github.com/SuperMarioYL/forkspan)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/hero-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/hero-light.svg">
-  <img src="./assets/hero-light.svg" width="880" alt="ForkSpan — 在运行中被攻陷时 fork 该 agent 运行">
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/hero-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/hero-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/hero-dark.svg">
+  <img src="./assets/presentation/hero-light.svg" width="960" alt="Hero diagram">
 </picture>
 
-<p align="center"><sub>ForkSpan 是面向 IR 工程师、对被攻陷的 agent 运行做反事实回放的 fork 原语。</sub></p>
+# forkspan
 
-**别再杀掉运行、丢掉因果链——在入侵 span 处 fork 已记录的状态，回放反事实分支以定位触发载荷。**
+**从关键 Span 检查 Agent 轨迹。**
 
-<p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/github/license/SuperMarioYL/forkspan?color=blue" alt="license"></a>
-  &nbsp;<a href="https://github.com/SuperMarioYL/forkspan/releases"><img src="https://img.shields.io/github/v/release/SuperMarioYL/forkspan" alt="最新发布"></a>
-  &nbsp;<a href="https://github.com/SuperMarioYL/forkspan/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SuperMarioYL/forkspan/ci.yml?branch=main&label=ci" alt="CI"></a>
-  &nbsp;<img src="https://img.shields.io/badge/Go-1.24-00ADD8?logo=go" alt="Go 1.24">
-  &nbsp;<img src="https://img.shields.io/badge/Agent-fork%20原语-5E5CE6" alt="Agent — fork 原语">
-</p>
-
-## 目录
-
-- [为什么需要它](#为什么需要它)
-- [架构](#架构)
-- [安装](#安装)
-- [快速开始](#快速开始)
-- [用法](#用法)
-- [演示](#演示)
-- [路线图](#路线图)
-- [许可](#许可)
+ForkSpan 把记录的 OTLP GenAI Span 加载成可浏览的树，并在选定 Span 导出 StateSnapshot。
 
 ## 为什么需要它
 
-当一个自主 agent 在运行中被攻陷（提示注入、工具调用劫持、策略逃逸）时，今天唯一安全的做法是杀掉运行——但这会切断那条本可解释攻陷*如何*触发的因果链。IR 循环只剩下一个只读时间线和一段推断，永远得不到受控实验。ForkSpan 把"在 span X 处 fork 已记录状态、回放反事实"做成一等原语，运行在 OTel-GenAI span 之上，让操作者能*证明*哪个载荷驱动了攻陷，而不是争论它。OTel-GenAI span 标准是那把钥匙：一个公共的 span 单元，状态可在此被快照、分支差异可在此被机器校验。这正是 [affaan-m/ECC](https://github.com/affaan-m/ECC) 这类 agent 运行时生态所缺少的取证原语——最接近的类比是面向 agent 流的 [langgenius/dify](https://github.com/langgenius/dify)，但谁都没有在已记录 span 上 fork 反事实分支。
+调查可疑工具调用时，需要看到上游 Span 与可达的后续调用。ForkSpan 将轨迹导出文件转成本地检查界面，并提供可脚本化的快照导出。
 
-> **诚实接缝：** v0.1 对已记录 span 做的是*结构性*反事实投影——不重跑 LLM。每处不确定的分歧都通过 `NeedsReExec` 标出，而非默默声称已执行。实时重跑在 v0.1 之后。
+- **聚焦选定 Span** — 按明确 ID 导出记录状态。
+- **终端与脚本都可使用** — TUI 与 JSON 输出使用同一轨迹模型。
+- **轨迹留在本地** — 检查无需模型调用或远程服务。
 
-<h2><img src="https://api.iconify.design/tabler:topology-star-3.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 架构</h2>
+## 架构
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/atlas-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/atlas-light.svg">
-  <img src="./assets/atlas-light.svg" width="880" alt="架构：OTLP-GenAI spans → ingest span 树 → fork StateSnapshot → tui 导航器">
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/architecture-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/architecture-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/architecture-dark.svg">
+  <img src="./assets/presentation/architecture-light.svg" width="960" alt="Architecture diagram">
 </picture>
 
-单一二进制、三层、无守护进程、v0.1 不联网。Ingest 是纯 JSON 解析（无 OTLP 收集器、无实时尾随）。Fork 与 diff 是 span 树上的纯函数。TUI 是唯一的交互界面——一个进程、一个二进制、演示只需一条无配置命令。
+ingest 解析 OTLP 文件并建立 Span 关系；TUI 展示树，快照模块按选定 ID 收集记录状态。当前 fork 和 replay 命令是路线图占位，不执行反事实运行。
 
-<h2><img src="https://api.iconify.design/tabler:download.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 安装</h2>
+| 组件 | 职责 |
+| --- | --- |
+| `OTLP JSON` | internal/ingest/otlp.go |
+| `Span tree` | internal/ingest/model.go |
+| `Snapshot` | internal/fork/snapshot.go |
+| `TUI / JSON` | internal/tui |
 
-```bash
-go install github.com/SuperMarioYL/forkspan/cmd/forkspan@latest
-```
+## 安装与快速上手
 
-或从源码构建：
-
-```bash
-git clone https://github.com/SuperMarioYL/forkspan
-cd forkspan && go build -o forkspan ./cmd/forkspan
-```
-
-需要 Go 1.24+。macOS/Linux 为主（TUI/tty）；Windows 尽力而为。
-
-<h2><img src="https://api.iconify.design/tabler:rocket.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 快速开始</h2>
+使用仓库清单指定的运行时版本构建，并在仓库根目录运行示例。
 
 ```bash
-go build -o forkspan ./cmd/forkspan
-./forkspan inspect assets/sample-compromised-trace.json            # 在内置的被攻陷 agent 轨迹上打开导航器
-./forkspan inspect assets/sample-compromised-trace.json -s 0a0b0c0d0e0f0a0b --json   # 在入侵 span 处导出 StateSnapshot
+git clone https://github.com/SuperMarioYL/forkspan.git
+cd forkspan
+go build ./cmd/forkspan
 ```
 
-<details><summary>示例输出</summary>
-
-```
-{"at_span_id":"0a0b0c0d0e0f0a0b","reached_spans":[
-  {"span_id":"0102030405060708","name":"agent.invoke","role":"Agent","kind":"SPAN_KIND_INTERNAL","status":{"code":"STATUS_CODE_OK","message":""},"intrusion":false,...},
-  {"span_id":"0a0b0c0d0e0f0a0b","name":"llm.chat","role":"LLM","kind":"SPAN_KIND_INTERNAL","status":{"code":"STATUS_CODE_OK","message":""},"intrusion":true,...}],
- "reachable_tool_calls":["1112131415161718","2122232425262728"],
- "agent_state":{...}}
-```
-</details>
-
-<h2><img src="https://api.iconify.design/tabler:terminal-2.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 用法</h2>
-
-三个子命令：`inspect`（m1，已实现）、`fork` 与 `replay`（m2/m3，路线图指针）。
+列出 assets/sample-compromised-trace.json 中随仓提供的完整合成异常轨迹。
 
 ```bash
-# 1. 导航已记录的 span 树，标记入侵 span，fork 出 StateSnapshot。
-./forkspan inspect trace.json
-#   j/k 导航 · m 标记入侵 · s fork StateSnapshot → forkspan-snapshot.json · q 退出
-
-# 2. 非交互式打印已记录的 span 树以发现 span ID（CI / 脚本友好）。
-./forkspan inspect trace.json --list
-
-# 3. 非交互式快照导出到 stdout（从 --list 管道传入 span id）。
-./forkspan inspect trace.json -s <spanId> --json > snapshot.json
-
-# 4. 反事实 fork + 回放（m2 里程碑——v0.1 打印路线图指针）。
-./forkspan fork --span <spanId> --block-tool bash
-./forkspan replay --branch <id>
+go run ./cmd/forkspan inspect assets/sample-compromised-trace.json --list
 ```
 
-内置的 `assets/sample-compromised-trace.json` 是一条合成、HF 事件风格的轨迹：一次 `agent.invoke` 运行，其中 `llm.chat` span 里的提示注入载荷（预标记 `forkspan.intrusion=true`）驱动了两处外泄工具调用（`bash` → `http`）。该入侵 span 的可达工具调用集合恰好就是那两处外泄——即反事实（m2）将投影并对比的爆炸半径。
+## 实际运行示例
 
-<h2><img src="https://api.iconify.design/tabler:photo.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 演示</h2>
+<picture>
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/process-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/process-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/process-dark.svg">
+  <img src="./assets/presentation/process-light.svg" width="960" alt="Process diagram">
+</picture>
 
-![demo](assets/demo.gif)
+The recorded tree exposes the marked intrusion span and its downstream tool-call spans.
 
-上面的流程脚本化于 [`docs/demo.tape`](./docs/demo.tape)，由 `demo` 工作流按需重渲染；提交进仓库的 `assets/demo.gif` 是事实来源。m1 里程碑在内置轨迹上端到端跑通 inspect + 快照导出路径。
+```text
+[Agent]  agent.invoke  0102030405060708
+  [LLM]    llm.chat  [intrusion]  0a0b0c0d0e0f0a0b
+    [Tool]   tool.call.bash  1112131415161718
+    [Tool]   tool.call.http  2122232425262728
+  [LLM]    llm.chat  3132333435363738
+    [Tool]   tool.call.search  4142434445464748
+```
 
-<h2><img src="https://api.iconify.design/tabler:map-2.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 路线图</h2>
+完整命令与输出保存在 [docs/demo-results.json](./docs/demo-results.json). 输入和复现代码均随仓提供。
 
-- [x] **m1 — ingest + 导航。** 将 OTLP-GenAI JSON 导出解析为 span 树 + 工具调用子图；TUI 导航器标记任一 span 为入侵 span 并导出 `StateSnapshot`。
-- [ ] **m2 — fork + diff。** 在被标记 span 处快照状态，施加反事实变异（阻断工具 / 脱敏载荷 / 加固策略），投影下游工具调用子图，并渲染已记录与反事实的并排 diff，带 `NeedsReExec` 标记。
-- [ ] **m3 — 打磨 + 演示。** 内置被攻陷 agent 轨迹、asciinema 录制、一条 `forkspan demo` 命令在 2 分钟内复现完整 fork/inspect/回放流程。
-- [ ] **v0.1 之后 — 实时重跑。** 在已快照状态上做确定性 agent 回放，以确认不确定的分歧（闭合 `NeedsReExec` 接缝）。
+![已有终端录制](./assets/demo.gif)
 
-### ForkSpan 与相邻工具对比
+保留已有录制供参考；上方文字示例给出当前可复现的操作。
 
-| 维度 | ForkSpan | [affaan-m/ECC](https://github.com/affaan-m/ECC) |
-|---|---|---|
-| 在某 span 处反事实 fork | ✓ | — |
-| 已记录状态快照（不重跑） | ✓ | — |
-| OTel-GenAI span 消费者 | ✓ | partial |
-| 实时评估 / 重跑框架 | partial（`NeedsReExec`） | ✓ |
-| 入侵取证聚焦 | ✓ | — |
+## 用法
 
-ECC 是更宽的 agent 运行时/评估参照；ForkSpan 与之互补——是那些运行时已采集 span 的取证消费者，而非竞争者。
-
-<h2><img src="https://api.iconify.design/tabler:license.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 许可</h2>
-
-MIT——见 [LICENSE](./LICENSE)。欢迎提 issue 与 PR；附上一份脱敏的被攻陷 agent 轨迹以在真实数据上复现 fork 流程。
-
-推送后设置仓库 topics，让取证受众能找到它：
+CLI 提供以下操作。示例之外的命令需要替换成你的文件路径或标识。
 
 ```bash
-gh repo edit --add-topic agent --add-topic otel --add-topic opentelemetry --add-topic forensics --add-topic llm-agents --add-topic tracing
+go run ./cmd/forkspan inspect assets/sample-compromised-trace.json --list
+go run ./cmd/forkspan inspect assets/sample-compromised-trace.json -s 0a0b0c0d0e0f0a0b --json
+# Interactive navigation requires a terminal:
+go run ./cmd/forkspan inspect assets/sample-compromised-trace.json
 ```
 
-## 分享它
+## 配置
 
-```
-ForkSpan —— 为被攻陷 Agent 运行打造的 fork 原语。在入侵 span 处对已记录状态做快照，基于 OTel-GenAI span 回放反事实以定位触发载荷，而不必杀掉运行。 https://github.com/SuperMarioYL/forkspan
-```
+--list 无需 TUI 即可打印树；--snapshot/-s 选择 Span。--json 将快照写到标准输出，--out/-o 可指定文件。在 TUI 中使用 j/k 移动、m 标记、s 保存、q 退出。
 
-<p align="center"><sub><a href="./LICENSE">MIT</a> © 2026 SuperMarioYL</sub></p>
+## 集成与职责分工
+
+<picture>
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/integrations-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/integrations-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/integrations-dark.svg">
+  <img src="./assets/presentation/integrations-light.svg" width="960" alt="Integrations diagram">
+</picture>
+
+以下路径已有源码实现。按任务选择输入，并把生成的结果与项目一起保存。
+
+| 路径 | 已实现职责 |
+| --- | --- |
+| OTLP JSON | Recorded GenAI spans |
+| Terminal TUI | Navigate and mark spans |
+| StateSnapshot JSON | Scriptable state export |
+| Span IDs | Non-interactive tree listing |
+
+## 限制与后续方向
+
+- fork 与 replay 尚未实现，当前命令只输出路线图说明。
+- 记录中的可达性不等于因果责任证明；工具和模型都不会重新执行。
+- 随仓异常轨迹是合成数据，不是实时事件记录。
+
+反事实投影、分支差异和实时回放是后续工作。当前已实现轨迹检查与记录状态导出。
+
+## 许可与贡献
+
+许可见 [LICENSE](./LICENSE). 反馈问题时请提供最小输入、执行命令和实际输出。

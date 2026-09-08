@@ -1,0 +1,78 @@
+{
+  "name": "forkspan",
+  "tagline": "Inspect an agent trace at the point that matters.",
+  "architecture": {
+    "title": "How ForkSpan works",
+    "nodes": [
+      {
+        "title": "OTLP JSON",
+        "detail": "internal/ingest/otlp.go"
+      },
+      {
+        "title": "Span tree",
+        "detail": "internal/ingest/model.go"
+      },
+      {
+        "title": "Snapshot",
+        "detail": "internal/fork/snapshot.go"
+      },
+      {
+        "title": "TUI / JSON",
+        "detail": "internal/tui"
+      }
+    ],
+    "edges": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        3
+      ]
+    ]
+  },
+  "process": {
+    "title": "From input to a useful result",
+    "steps": [
+      {
+        "title": "Load trace",
+        "detail": "Bundled OTLP export"
+      },
+      {
+        "title": "Build relationships",
+        "detail": "Recorded span tree"
+      },
+      {
+        "title": "Inspect state",
+        "detail": "IDs and reachable tools"
+      }
+    ],
+    "result": "The recorded tree exposes the marked intrusion span and its downstream tool-call spans."
+  },
+  "integrations": {
+    "title": "Supported input and output routes",
+    "items": [
+      {
+        "title": "OTLP JSON",
+        "detail": "Recorded GenAI spans"
+      },
+      {
+        "title": "Terminal TUI",
+        "detail": "Navigate and mark spans"
+      },
+      {
+        "title": "StateSnapshot JSON",
+        "detail": "Scriptable state export"
+      },
+      {
+        "title": "Span IDs",
+        "detail": "Non-interactive tree listing"
+      }
+    ]
+  }
+}
