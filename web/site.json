@@ -211,5 +211,6 @@
         "code": "go run ./cmd/forkspan inspect assets/sample-compromised-trace.json --list\ngo run ./cmd/forkspan inspect assets/sample-compromised-trace.json -s 0a0b0c0d0e0f0a0b --json\n# Interactive navigation requires a terminal:\ngo run ./cmd/forkspan inspect assets/sample-compromised-trace.json"
       }
     ]
-  }
+  },
+  "content_version": "v0.8.0"
 }
