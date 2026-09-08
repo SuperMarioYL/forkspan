@@ -148,6 +148,10 @@
           "alt": {
             "en": "Follow the operation",
             "zh": "处理过程"
+          },
+          "mobile": {
+            "light": "/assets/presentation/process-mobile-light.svg",
+            "dark": "/assets/presentation/process-mobile-dark.svg"
           }
         }
       },
@@ -166,6 +170,10 @@
           "alt": {
             "en": "How ForkSpan works",
             "zh": "ForkSpan 的工作方式"
+          },
+          "mobile": {
+            "light": "/assets/presentation/architecture-mobile-light.svg",
+            "dark": "/assets/presentation/architecture-mobile-dark.svg"
           }
         }
       },
@@ -184,6 +192,10 @@
           "alt": {
             "en": "Connect the pieces",
             "zh": "输入与输出"
+          },
+          "mobile": {
+            "light": "/assets/presentation/integrations-mobile-light.svg",
+            "dark": "/assets/presentation/integrations-mobile-dark.svg"
           }
         }
       }
@@ -212,5 +224,42 @@
       }
     ]
   },
-  "content_version": "v0.8.0"
+  "content_version": "v0.8.0",
+  "changelog": [
+    {
+      "version": "v0.8.0",
+      "en": "forkspan v0.8.0: fix version-surface drift — the in-source version var (stuck at v0.6.0 through v0.7.0) and the live-site content_version now stay in lockstep with the VERSION file, and the v0.7.0 release's red CI test suite is green again. `forkspan --version` self-reports the true tag; a new guard test pins site.json to the canonical VERSION so the drift cannot recur. No product-logic change.",
+      "zh": "forkspan v0.8.0：修复版本面漂移——源码内版本常量（v0.7.0 发布时仍停在 v0.6.0）与官网 content_version 现与 VERSION 文件保持一致，v0.7.0 发布时变红的 CI 测试套件重新转绿。`forkspan --version` 现正确自报版本；新增守卫测试把 site.json 钉到权威 VERSION，杜绝再次漂移。无产品逻辑变更。"
+    },
+    {
+      "version": "v0.6.0",
+      "en": "forkspan v0.6.0: orphan spans — whose parent is missing from a partial export (common with partial collector grabs of a compromised-agent run) — no longer vanish from the navigator and `inspect --list`. Tree.Roots() now treats a span with an absent parent as a root, so every span (incl. a pre-marked intrusion span) stays discoverable. Behavior-preserving for well-formed traces.",
+      "zh": "forkspan v0.6.0：父 span 缺失的孤儿 span（被攻破 agent 运行的部分导出里常见）不再从导航器和 `inspect --list` 中消失。Tree.Roots() 现在把父 span 不在导出里的 span 也当作根，这样每条 span（含预标记的入侵 span）都能被发现。对结构完整的 trace 行为不变。"
+    },
+    {
+      "version": "v0.5.0",
+      "en": "forkspan v0.5.0: fix the stale in-source version so the binary self-reports v0.5.0 (was stuck at v0.3.0 through v0.4.0); refresh en+zh-CN README sample output to the real snake_case reached_spans shape; add `inspect --list` to print the recorded span tree non-interactively so CI/scripts can discover span IDs without the TUI.",
+      "zh": "forkspan v0.5.0：修正二进制自报版本（v0.4.0 发布时仍打印 v0.3.0）；更新 README 示例输出为真实的 snake_case reached_spans 形状；新增 inspect --list 非交互打印 span 树，便于 CI/脚本发现 span ID。"
+    },
+    {
+      "version": "v0.4.0",
+      "zh": "inspect --snapshot 不再冲突：--json -o 现在会写入文件（此前被静默丢弃），默认路径也不再向 stdout 与文件重复输出。JSON 快照的 reached_spans 现在使用规范的 snake_case 键名与字符串枚举，而非原始整数。",
+      "en": "inspect --snapshot no longer collides: --json -o writes the file (was silently dropped) and the default path no longer double-outputs to stdout and file. The JSON snapshot's reached_spans now emit canonical snake_case keys and string enums instead of raw ints."
+    },
+    {
+      "version": "v0.3.0",
+      "zh": "哪怕被攻破的 agent 把调用链改得乱七八糟（断掉或自指的父链接），快照也不会卡死——照样把那一刻的状态给你，而不是一个冻住的终端。",
+      "en": "Even when a compromised agent mangles the call chain — broken or self-referencing links — the snapshot won't lock up. You still get the state at that moment, not a frozen terminal."
+    },
+    {
+      "version": "v0.2.0",
+      "zh": "照文档敲的 fork/replay 命令现在能正常解析并指路，不再报未知参数；工具调用不再被误判漏掉，能触达的工具一条都不漏。",
+      "en": "Documented fork/replay invocations now parse and point the way instead of erroring on unknown flags; tool spans are no longer misclassified, so every reachable tool stays in the set."
+    },
+    {
+      "version": "v0.7.0",
+      "date": "2026-08-24",
+      "note": "refresh: content re-verified for v0.7.0 (fix-snapshot-payload-base64 — the inspect --json snapshot now emits the readable trigger payload, reinforcing the hero pitch). No content change; CI rebuild."
+    }
+  ]
 }
