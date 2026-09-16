@@ -224,12 +224,22 @@
       }
     ]
   },
-  "content_version": "v0.8.0",
+  "content_version": "v0.9.0",
   "changelog": [
+    {
+      "version": "v0.9.0",
+      "en": "forkspan v0.9.0: parse conformance + navigator fixes — OTLP/JSON exports emitted with the spec-mandated integer enums (kind, status.code) and numeric int64 timestamps no longer fail the whole parse with exit 1; hex trace/span IDs are case-insensitive per the OTLP spec, so mixed-case exports keep their parent→child structure and span queries match any case; spans trapped in a malformed parent cycle (self-loop or mutual) no longer silently vanish from the navigator and inspect --list; and the committed demo.gif was re-rendered so it no longer demos the long-fixed \"unknown flag\" errors.",
+      "zh": "forkspan v0.9.0：解析合规 + 导航器修复——按 OTLP/JSON 规范以整数枚举（kind、status.code）和数字 int64 时间戳导出的 trace 不再导致整体解析失败退出；hex trace/span ID 按 OTLP 规范大小写不敏感，混合大小写的导出不再丢失父子结构、span 查询任意大小写均可命中；陷入畸形父环（自环或互环）的 span 不再从导航器和 inspect --list 中无声消失；同时重新渲染了 demo.gif，不再演示早已修复的 \"unknown flag\" 报错。"
+    },
     {
       "version": "v0.8.0",
       "en": "forkspan v0.8.0: fix version-surface drift — the in-source version var (stuck at v0.6.0 through v0.7.0) and the live-site content_version now stay in lockstep with the VERSION file, and the v0.7.0 release's red CI test suite is green again. `forkspan --version` self-reports the true tag; a new guard test pins site.json to the canonical VERSION so the drift cannot recur. No product-logic change.",
       "zh": "forkspan v0.8.0：修复版本面漂移——源码内版本常量（v0.7.0 发布时仍停在 v0.6.0）与官网 content_version 现与 VERSION 文件保持一致，v0.7.0 发布时变红的 CI 测试套件重新转绿。`forkspan --version` 现正确自报版本；新增守卫测试把 site.json 钉到权威 VERSION，杜绝再次漂移。无产品逻辑变更。"
+    },
+    {
+      "version": "v0.7.0",
+      "en": "forkspan v0.7.0: the inspect --json snapshot now emits the recorded trigger payload as readable text instead of base64 — the payload that drove the compromise reads straight out of the documented demo command, reinforcing the localize-the-trigger-payload pitch.",
+      "zh": "forkspan v0.7.0：inspect --json 快照中的触发载荷不再以 base64 呈现，而是直接可读的文本——照文档敲的示例命令即可看到驱动入侵的载荷，进一步强化\"定位触发载荷\"的核心卖点。"
     },
     {
       "version": "v0.6.0",
@@ -255,11 +265,6 @@
       "version": "v0.2.0",
       "zh": "照文档敲的 fork/replay 命令现在能正常解析并指路，不再报未知参数；工具调用不再被误判漏掉，能触达的工具一条都不漏。",
       "en": "Documented fork/replay invocations now parse and point the way instead of erroring on unknown flags; tool spans are no longer misclassified, so every reachable tool stays in the set."
-    },
-    {
-      "version": "v0.7.0",
-      "date": "2026-08-24",
-      "note": "refresh: content re-verified for v0.7.0 (fix-snapshot-payload-base64 — the inspect --json snapshot now emits the readable trigger payload, reinforcing the hero pitch). No content change; CI rebuild."
     }
   ]
 }
