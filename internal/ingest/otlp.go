@@ -1,11 +1,13 @@
 package ingest
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	cmn "go.opentelemetry.io/proto/otlp/common/v1"
@@ -86,12 +88,16 @@ func (t *Tree) Children(parentID string) []string { return t.children[parentID] 
 
 // Roots returns root span IDs: spans whose ParentID is empty OR whose parent is
 // absent from the export (orphan spans — OTLP-spec-allowed for partial collector
-// grabs), so the navigator and `inspect --list` never silently drop them.
+// grabs) OR whose parent chain is trapped in a cycle (a malformed /
+// compromised-agent trace: a self-loop or mutual loop). Cycle-bound spans can
+// never be reached by walking down from a real root, so they surface as roots
+// themselves — otherwise they would silently vanish from the navigator and
+// `inspect --list` (exit 0, no output) while staying snapshot-able via -s.
 func (t *Tree) Roots() []string {
 	seen := map[string]bool{}
 	var roots []string
 	for _, s := range t.Spans {
-		if (s.ParentID == "" || t.Get(s.ParentID) == nil) && !seen[s.SpanID] {
+		if (s.ParentID == "" || t.Get(s.ParentID) == nil || t.parentCycle(s.SpanID)) && !seen[s.SpanID] {
 			roots = append(roots, s.SpanID)
 			seen[s.SpanID] = true
 		}
@@ -101,6 +107,26 @@ func (t *Tree) Roots() []string {
 		return a.Start.Before(b.Start)
 	})
 	return roots
+}
+
+// parentCycle reports whether the parent chain from id's parent revisits a
+// span before terminating — i.e. id is trapped in (or hangs off) a parent
+// cycle and is unreachable from any real root. The walk is bounded by a
+// seen-set, the same guard pattern as diff.Subgraph, fork.Snapshot and the TUI
+// flattener, so a malformed chain can only cost one chain walk.
+func (t *Tree) parentCycle(id string) bool {
+	start := t.Get(id)
+	if start == nil {
+		return false
+	}
+	seen := map[string]bool{id: true}
+	for cur := t.Get(start.ParentID); cur != nil; cur = t.Get(cur.ParentID) {
+		if seen[cur.SpanID] {
+			return true
+		}
+		seen[cur.SpanID] = true
+	}
+	return false
 }
 
 // ToolCalls returns every tool-call span (Role==Tool) in start order.
@@ -158,16 +184,40 @@ type otlpSpanJSON struct {
 	SpanID            string          `json:"spanId"`
 	ParentSpanID      string          `json:"parentSpanId"`
 	Name              string          `json:"name"`
-	Kind              string          `json:"kind"`
-	StartTimeUnixNano string          `json:"startTimeUnixNano"`
-	EndTimeUnixNano   string          `json:"endTimeUnixNano"`
+	Kind              otlpString      `json:"kind"`
+	StartTimeUnixNano otlpString      `json:"startTimeUnixNano"`
+	EndTimeUnixNano   otlpString      `json:"endTimeUnixNano"`
 	Attributes        []otlpKeyValue  `json:"attributes"`
 	Status            *otlpStatusJSON `json:"status"`
 }
 
 type otlpStatusJSON struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code    otlpString `json:"code"`
+	Message string     `json:"message"`
+}
+
+// otlpString accepts the two encodings the OTLP/JSON spec mandates for these
+// scalar fields: enum fields ("kind", "status.code") "MUST be encoded as
+// integer values", and 64-bit integer fields (startTimeUnixNano /
+// endTimeUnixNano) are decoded accepting "either numbers or strings". The raw
+// token text is kept — string content unquoted, number literal verbatim — so
+// each use site (spanKindFromWire, statusCodeFromWire, parseNanoTime) can
+// interpret both forms. Any other bare token (e.g. null) flows through and
+// degrades to the zero value at the use site, matching protojson semantics.
+type otlpString string
+
+func (s *otlpString) UnmarshalJSON(b []byte) error {
+	t := bytes.TrimSpace(b)
+	if len(t) > 0 && t[0] == '"' {
+		var v string
+		if err := json.Unmarshal(t, &v); err != nil {
+			return err
+		}
+		*s = otlpString(v)
+		return nil
+	}
+	*s = otlpString(t)
+	return nil
 }
 
 type otlpKeyValue struct {
@@ -207,14 +257,20 @@ func convertEnvelope(env otlpEnvelope) []Span {
 }
 
 func convertSpanJSON(sp otlpSpanJSON) Span {
+	// Hex IDs are case-insensitive per the OTLP/JSON spec ("represented as
+	// case-insensitive hex-encoded strings"; the spec's own example is
+	// uppercase), so canonicalize to lowercase at the parse boundary — the
+	// byID index, children map, orphan predicate, snapshot walks and -s
+	// queries then compare IDs case-insensitively by construction. The proto
+	// path already emits lowercase via hexEncode.
 	s := Span{
-		SpanID:   sp.SpanID,
-		ParentID: sp.ParentSpanID,
-		TraceID:  sp.TraceID,
-		Kind:     spanKindFromString(sp.Kind),
+		SpanID:   strings.ToLower(sp.SpanID),
+		ParentID: strings.ToLower(sp.ParentSpanID),
+		TraceID:  strings.ToLower(sp.TraceID),
+		Kind:     spanKindFromWire(string(sp.Kind)),
 		Name:     sp.Name,
-		Start:    parseNanoTime(sp.StartTimeUnixNano),
-		End:      parseNanoTime(sp.EndTimeUnixNano),
+		Start:    parseNanoTime(string(sp.StartTimeUnixNano)),
+		End:      parseNanoTime(string(sp.EndTimeUnixNano)),
 	}
 	for _, kv := range sp.Attributes {
 		s.Attrs = append(s.Attrs, KeyValue{Key: kv.Key, Value: anyJSONValue(kv.Value)})
@@ -251,7 +307,7 @@ func convertSpanJSON(sp otlpSpanJSON) Span {
 
 	if sp.Status != nil {
 		s.Status = Status{
-			Code:    statusCodeFromString(sp.Status.Code),
+			Code:    statusCodeFromWire(string(sp.Status.Code)),
 			Message: sp.Status.Message,
 		}
 	} else {
@@ -311,6 +367,29 @@ func spanKindFromString(k string) SpanKind {
 	return SpanKindUnspecified
 }
 
+// spanKindFromWire resolves the OTLP/JSON wire form of a span kind: the spec
+// mandates integer enums ("Values of enum fields MUST be encoded as integer
+// values"), while the name-string forms used by the bundled sample trace and
+// older proto3-JSON emitters stay accepted for compatibility.
+func spanKindFromWire(k string) SpanKind {
+	if n, err := strconv.Atoi(k); err == nil {
+		switch n {
+		case 1:
+			return SpanKindInternal
+		case 2:
+			return SpanKindServer
+		case 3:
+			return SpanKindClient
+		case 4:
+			return SpanKindProducer
+		case 5:
+			return SpanKindConsumer
+		}
+		return SpanKindUnspecified
+	}
+	return spanKindFromString(k)
+}
+
 func statusCodeFromString(c string) StatusCode {
 	switch c {
 	case "STATUS_CODE_OK":
@@ -319,6 +398,21 @@ func statusCodeFromString(c string) StatusCode {
 		return StatusError
 	}
 	return StatusUnset
+}
+
+// statusCodeFromWire resolves the OTLP/JSON wire form of a status code:
+// integer enums per the spec, name strings for compatibility.
+func statusCodeFromWire(c string) StatusCode {
+	if n, err := strconv.Atoi(c); err == nil {
+		switch n {
+		case 1:
+			return StatusOK
+		case 2:
+			return StatusError
+		}
+		return StatusUnset
+	}
+	return statusCodeFromString(c)
 }
 
 func parseNanoTime(s string) time.Time {
