@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,6 +84,55 @@ func TestInspectSnapshot_JSONOutWritesFile(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "at_span_id") {
 		t.Errorf("stdout = %q, want JSON containing at_span_id (the --json echo)", stdout.String())
+	}
+}
+
+// TestInspectSnapshot_UppercaseSpanIDResolves is the regression test for
+// fix-snapshot-query-case-insensitive: OTLP/JSON hex span ids are
+// case-insensitive per the spec (whose own example id is uppercase), so a
+// user-supplied -s query must resolve whatever case it is written in, and a
+// padded query (an id pasted with surrounding whitespace) must resolve too.
+// Pre-fix the flag value was passed through verbatim into a case-sensitive byID
+// lookup, so `-s 0A0B0C0D0E0F0A0B` exited 1 with
+// `fork: span "0A0B0C0D0E0F0A0B" not in tree` while the lowercase form worked —
+// contradicting the v0.9.0 changelog's claim that span queries match any case.
+func TestInspectSnapshot_UppercaseSpanIDResolves(t *testing.T) {
+	trace := sampleTraceAbs(t)
+	for _, query := range []string{
+		"0A0B0C0D0E0F0A0B",     // all upper (the OTLP spec's own example case)
+		"0A0b0C0d0E0f0A0b",     // mixed
+		"  0a0b0c0d0e0f0a0b\n", // padded paste
+	} {
+		var stdout bytes.Buffer
+		root := newRoot()
+		root.SetArgs([]string{"inspect", trace, "-s", query, "--json"})
+		root.SetOut(&stdout)
+		if err := root.Execute(); err != nil {
+			t.Fatalf("inspect -s %q: %v (hex span ids are case-insensitive; the query must resolve)", query, err)
+		}
+		var snap struct {
+			AtSpanID string `json:"at_span_id"`
+		}
+		if err := json.Unmarshal([]byte(strings.TrimSpace(stdout.String())), &snap); err != nil {
+			t.Fatalf("parse snapshot for query %q: %v", query, err)
+		}
+		if snap.AtSpanID != "0a0b0c0d0e0f0a0b" {
+			t.Errorf("query %q: at_span_id = %q, want the canonical lowercase 0a0b0c0d0e0f0a0b", query, snap.AtSpanID)
+		}
+	}
+}
+
+// TestInspectSnapshot_UnknownSpanIDStillFails guards the non-regressed half of
+// fix-snapshot-query-case-insensitive: normalizing the query must not turn a
+// genuinely absent span id into a silent success.
+func TestInspectSnapshot_UnknownSpanIDStillFails(t *testing.T) {
+	trace := sampleTraceAbs(t)
+	root := newRoot()
+	root.SetArgs([]string{"inspect", trace, "-s", "DEADBEEFDEADBEEF", "--json"})
+	root.SetOut(io.Discard)
+	root.SetErr(io.Discard)
+	if err := root.Execute(); err == nil {
+		t.Fatal("an unknown span id must still fail loudly, not resolve to something else")
 	}
 }
 

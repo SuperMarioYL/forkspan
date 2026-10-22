@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -172,5 +173,158 @@ func TestInferRole_ToolPrecedenceOverChat(t *testing.T) {
 		if l.Role != RoleLLM {
 			t.Errorf("%q Role = %q, want %q (genuine LLM classification must be preserved)", name, l.Role, RoleLLM)
 		}
+	}
+}
+
+// TestLoadBytes_ModelInvocationOperationsClassifiedLLM is the regression test
+// for fix-genai-operation-role-mapping: the OTel-GenAI semconv defines
+// text_completion and embeddings alongside chat / execute_tool / invoke_agent,
+// and a conforming exporter names the span "{operation} {model}". Pre-fix the
+// role switch only knew chat/execute_tool/invoke_agent, so these fell through to
+// inferRole(name) — where "text_completion frontier-lab-8b" matches neither
+// "chat" nor "llm" — and the span rendered as RoleUnknown ("[span]") in
+// `inspect --list` instead of RoleLLM.
+func TestLoadBytes_ModelInvocationOperationsClassifiedLLM(t *testing.T) {
+	cases := []struct{ op, name string }{
+		{"text_completion", "text_completion frontier-lab-8b"},
+		{"embeddings", "embeddings text-embedding-3"},
+	}
+	for _, tc := range cases {
+		trace := `{
+		  "resourceSpans": [{
+		    "scopeSpans": [{
+		      "spans": [{
+		        "traceId": "00112233445566778899aabbccddeeff",
+		        "spanId": "77cc77cc77cc77cc",
+		        "name": "` + tc.name + `",
+		        "kind": "SPAN_KIND_INTERNAL",
+		        "startTimeUnixNano": "1785283200100000000",
+		        "endTimeUnixNano": "1785283200150000000",
+		        "attributes": [
+		          { "key": "gen_ai.system", "value": { "stringValue": "demo" } },
+		          { "key": "gen_ai.operation.name", "value": { "stringValue": "` + tc.op + `" } }
+		        ],
+		        "status": { "code": "STATUS_CODE_OK" }
+		      }]
+		    }]
+		  }]
+		}`
+		tr, err := LoadBytes([]byte(trace))
+		if err != nil {
+			t.Fatalf("LoadBytes(%s): %v", tc.op, err)
+		}
+		s := tr.Get("77cc77cc77cc77cc")
+		if s == nil {
+			t.Fatalf("missing span for %s", tc.op)
+		}
+		if s.Role != RoleLLM {
+			t.Errorf("gen_ai.operation.name=%q (span %q) Role = %q, want %q", tc.op, tc.name, s.Role, RoleLLM)
+		}
+		if s.IsToolCall() {
+			t.Errorf("gen_ai.operation.name=%q must not classify as a tool call", tc.op)
+		}
+	}
+}
+
+// TestLoadBytes_NonFiniteDoubleValueForms is the regression test for
+// fix-nonfinite-double-value-parse: proto3 JSON encodes the non-finite doubles
+// as the strings "NaN" / "Infinity" / "-Infinity" (verified against
+// google.golang.org/protobuf's own JSON encoder), so a spec-legal non-finite
+// double attribute must not abort the whole parse. Pre-fix the wire struct typed
+// doubleValue as *float64, so one such attribute made json.Unmarshal fail with
+// "cannot unmarshal string into Go struct field ... doubleValue of type float64"
+// and the entire trace was lost.
+func TestLoadBytes_NonFiniteDoubleValueForms(t *testing.T) {
+	for _, special := range []string{"NaN", "Infinity", "-Infinity"} {
+		trace := `{
+		  "resourceSpans": [{
+		    "scopeSpans": [{
+		      "spans": [{
+		        "traceId": "00112233445566778899aabbccddeeff",
+		        "spanId": "88dd88dd88dd88dd",
+		        "name": "llm.chat",
+		        "kind": "SPAN_KIND_INTERNAL",
+		        "startTimeUnixNano": "1785283200100000000",
+		        "endTimeUnixNano": "1785283200150000000",
+		        "attributes": [
+		          { "key": "gen_ai.system", "value": { "stringValue": "demo" } },
+		          { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
+		          { "key": "gen_ai.request.temperature", "value": { "doubleValue": "` + special + `" } }
+		        ],
+		        "status": { "code": "STATUS_CODE_OK" }
+		      }]
+		    }]
+		  }]
+		}`
+		tr, err := LoadBytes([]byte(trace))
+		if err != nil {
+			t.Fatalf("LoadBytes(doubleValue=%q): %v (one non-finite attribute must not lose the trace)", special, err)
+		}
+		s := tr.Get("88dd88dd88dd88dd")
+		if s == nil {
+			t.Fatalf("span lost for doubleValue=%q", special)
+		}
+		// The value is kept as its wire string: encoding/json cannot marshal a
+		// Go NaN/Inf, so the snapshot must stay marshallable.
+		if got := s.AttrString("gen_ai.request.temperature"); got != special {
+			t.Errorf("doubleValue=%q: attr value = %q, want the wire string %q", special, got, special)
+		}
+		if _, err := json.Marshal(s); err != nil {
+			t.Errorf("doubleValue=%q: span must stay JSON-marshalable: %v", special, err)
+		}
+	}
+}
+
+// TestLoadBytes_FiniteDoubleValueUnchanged guards the non-regressed half of
+// fix-nonfinite-double-value-parse: a finite double still parses as a number
+// (not the wire token string), and a non-numeric string form is still rejected
+// rather than silently accepted.
+func TestLoadBytes_FiniteDoubleValueUnchanged(t *testing.T) {
+	const finiteTrace = `{
+	  "resourceSpans": [{
+	    "scopeSpans": [{
+	      "spans": [{
+	        "traceId": "00112233445566778899aabbccddeeff",
+	        "spanId": "88dd88dd88dd88dd",
+	        "name": "llm.chat",
+	        "kind": "SPAN_KIND_INTERNAL",
+	        "startTimeUnixNano": "1785283200100000000",
+	        "endTimeUnixNano": "1785283200150000000",
+	        "attributes": [
+	          { "key": "gen_ai.request.temperature", "value": { "doubleValue": 0.7 } }
+	        ],
+	        "status": { "code": "STATUS_CODE_OK" }
+	      }]
+	    }]
+	  }]
+	}`
+	tr, err := LoadBytes([]byte(finiteTrace))
+	if err != nil {
+		t.Fatalf("LoadBytes(finite double): %v", err)
+	}
+	kv, ok := tr.Get("88dd88dd88dd88dd").Attr("gen_ai.request.temperature")
+	if !ok {
+		t.Fatal("missing temperature attribute")
+	}
+	if f, isFloat := kv.Value.(float64); !isFloat || f != 0.7 {
+		t.Errorf("finite doubleValue = %#v, want float64(0.7)", kv.Value)
+	}
+
+	const bogusTrace = `{
+	  "resourceSpans": [{
+	    "scopeSpans": [{
+	      "spans": [{
+	        "traceId": "00112233445566778899aabbccddeeff",
+	        "spanId": "88dd88dd88dd88dd",
+	        "name": "llm.chat",
+	        "attributes": [
+	          { "key": "gen_ai.request.temperature", "value": { "doubleValue": "lukewarm" } }
+	        ]
+	      }]
+	    }]
+	  }]
+	}`
+	if _, err := LoadBytes([]byte(bogusTrace)); err == nil {
+		t.Error("a non-numeric doubleValue string must still be rejected, not silently accepted")
 	}
 }

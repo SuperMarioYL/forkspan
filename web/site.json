@@ -224,8 +224,13 @@
       }
     ]
   },
-  "content_version": "v0.9.0",
+  "content_version": "v0.10.0",
   "changelog": [
+    {
+      "version": "v0.10.0",
+      "en": "forkspan v0.10.0: query and parse-conformance fixes — `inspect -s <span-id>` now resolves hex span ids case-insensitively (and tolerates surrounding whitespace) as the OTLP spec requires, so an id copied from a spec-conforming export no longer fails with \"not in tree\"; the proto3-JSON non-finite double encodings (\"NaN\" / \"Infinity\" / \"-Infinity\") are accepted instead of aborting the whole trace parse; and the remaining OTel-GenAI model-invocation operations (text_completion, embeddings) classify as LLM spans instead of rendering as unclassified. No new command, flag, dependency or scope.",
+      "zh": "forkspan v0.10.0：查询与解析合规修复——`inspect -s <span-id>` 现按 OTLP 规范大小写不敏感地解析 hex span id（并容忍首尾空白），从符合规范的导出里复制的 ID 不再报 \"not in tree\"；proto3 JSON 的非有限 double 编码（\"NaN\" / \"Infinity\" / \"-Infinity\"）现被接受，不再导致整条轨迹解析中断；其余 OTel-GenAI 模型调用操作（text_completion、embeddings）现归类为 LLM span，不再显示为未分类。无新增命令、参数、依赖或范围。"
+    },
     {
       "version": "v0.9.0",
       "en": "forkspan v0.9.0: parse conformance + navigator fixes — OTLP/JSON exports emitted with the spec-mandated integer enums (kind, status.code) and numeric int64 timestamps no longer fail the whole parse with exit 1; hex trace/span IDs are case-insensitive per the OTLP spec, so mixed-case exports keep their parent→child structure and span queries match any case; spans trapped in a malformed parent cycle (self-loop or mutual) no longer silently vanish from the navigator and inspect --list; and the committed demo.gif was re-rendered so it no longer demos the long-fixed \"unknown flag\" errors.",

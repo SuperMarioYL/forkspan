@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/SuperMarioYL/forkspan/internal/fork"
 	"github.com/SuperMarioYL/forkspan/internal/ingest"
@@ -19,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "v0.9.0"
+var version = "v0.10.0"
 
 func main() {
 	if err := newRoot().Execute(); err != nil {
@@ -84,7 +85,7 @@ func newInspectCmd() *cobra.Command {
 				// (file + stdout), and the default-path case no longer echoes
 				// the full JSON to stdout AND writes the file.
 				resolved := snapshotOutPath(asJSON, outPath)
-				b, err := tui.DumpSnapshot(tree, snapshotID, resolved)
+				b, err := tui.DumpSnapshot(tree, canonicalSpanID(snapshotID), resolved)
 				if err != nil {
 					return err
 				}
@@ -122,6 +123,18 @@ func snapshotOutPath(asJSON bool, out string) string {
 		return "-" // stdout, no file
 	}
 	return "forkspan-snapshot.json"
+}
+
+// canonicalSpanID normalizes a user-supplied span id to the canonical lowercase
+// form the span tree indexes. OTLP/JSON represents traceId/spanId as
+// case-insensitive hex strings (the spec's own example id is uppercase), and
+// convertSpanJSON lowercases them at the parse boundary, so a query copied from
+// a spec-conforming export — or pasted with surrounding whitespace — must be
+// normalized here or the lookup misses. This is the only place a non-canonical
+// id can enter: --list output, TUI marks and the snapshot walks all use the
+// canonical form.
+func canonicalSpanID(id string) string {
+	return strings.ToLower(strings.TrimSpace(id))
 }
 
 // newForkCmd is the m2 milestone entry point. In v0.1 it prints a roadmap

@@ -231,9 +231,48 @@ type otlpAnyJSON struct {
 	StringValue *string         `json:"stringValue,omitempty"`
 	BoolValue   *bool           `json:"boolValue,omitempty"`
 	IntValue    *json.Number    `json:"intValue,omitempty"`
-	DoubleValue *float64        `json:"doubleValue,omitempty"`
+	DoubleValue *otlpDouble     `json:"doubleValue,omitempty"`
 	ArrayValue  *otlpArrayValue `json:"arrayValue,omitempty"`
 	KvlistValue *otlpKvlist     `json:"kvlistValue,omitempty"`
+}
+
+// otlpDouble accepts both encodings proto3 JSON uses for a double field: a JSON
+// number, or — for the non-finite values a JSON number cannot express — the
+// strings "NaN" / "Infinity" / "-Infinity" (protojson's own encoder emits
+// exactly those). Without the string arm, one such attribute makes
+// json.Unmarshal fail for the whole envelope and every span in the trace is
+// lost. The special value is kept as its wire string rather than a Go NaN/Inf
+// float64 because encoding/json refuses to marshal NaN/Inf, which would break
+// the snapshot dump that embeds these attribute values.
+type otlpDouble struct {
+	num     float64
+	special string
+}
+
+func (d *otlpDouble) UnmarshalJSON(b []byte) error {
+	t := bytes.TrimSpace(b)
+	if len(t) == 0 || t[0] != '"' {
+		return json.Unmarshal(t, &d.num)
+	}
+	var s string
+	if err := json.Unmarshal(t, &s); err != nil {
+		return err
+	}
+	switch s {
+	case "NaN", "Infinity", "-Infinity":
+		d.special = s
+		return nil
+	}
+	return fmt.Errorf("invalid double %q (want a number, NaN, Infinity or -Infinity)", s)
+}
+
+// any returns the value as it appears in the Span model: the wire string for a
+// non-finite double, the number otherwise.
+func (d otlpDouble) any() any {
+	if d.special != "" {
+		return d.special
+	}
+	return d.num
 }
 
 type otlpArrayValue struct {
@@ -278,7 +317,7 @@ func convertSpanJSON(sp otlpSpanJSON) Span {
 
 	op := s.AttrString("gen_ai.operation.name")
 	switch op {
-	case "chat":
+	case "chat", "text_completion", "embeddings":
 		s.Role = RoleLLM
 	case "execute_tool":
 		s.Role = RoleTool
@@ -334,7 +373,7 @@ func anyJSONValue(v otlpAnyJSON) any {
 		}
 		return v.IntValue.String()
 	case v.DoubleValue != nil:
-		return *v.DoubleValue
+		return v.DoubleValue.any()
 	case v.ArrayValue != nil:
 		var arr []any
 		for _, e := range v.ArrayValue.Values {
@@ -460,7 +499,7 @@ func convertSpanProto(sp *otlp.Span) Span {
 	}
 	op := s.AttrString("gen_ai.operation.name")
 	switch op {
-	case "chat":
+	case "chat", "text_completion", "embeddings":
 		s.Role = RoleLLM
 	case "execute_tool":
 		s.Role = RoleTool
