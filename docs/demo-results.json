@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_revision": "490386cd7834cc8109331e673e18d19c54db04b9",
+  "source_revision": "2b86e802c8675d836d483c4d3c4f61cbf84aac29",
   "scope": "Read-only navigation of the shipped synthetic OTLP trace; no live agent execution or counterfactual replay.",
   "steps": [
     {
