@@ -54,11 +54,24 @@ func LoadBytes(data []byte) (*Tree, error) {
 	if err := json.Unmarshal(data, &env); err != nil {
 		return nil, fmt.Errorf("parse OTLP-JSON: %w", err)
 	}
-	return NewTree(convertEnvelope(env)), nil
+	spans := convertEnvelope(env)
+	for _, s := range spans {
+		// spanId is the identity every surface is keyed on (-s queries, the
+		// byID index, child edges) and "" is the model's "no parent" sentinel,
+		// so a record without one is unaddressable. Report it instead of
+		// ingesting a span that could only corrupt other spans' ancestry.
+		if s.SpanID == "" {
+			return nil, fmt.Errorf("span %q has an empty spanId (spanId is required by OTLP and is the id ForkSpan keys on)", s.Name)
+		}
+	}
+	return NewTree(spans), nil
 }
 
 // NewTree builds a span tree from a flat span slice, indexing by ID and
-// grouping children by ParentID in start-time order.
+// grouping children by ParentID in start-time order. An empty SpanID is never
+// indexed: "" means "no parent" (see Roots), so indexing it would make every
+// root span's empty ParentID resolve to that unrelated span and fabricate an
+// ancestry.
 func NewTree(spans []Span) *Tree {
 	t := &Tree{
 		Spans:    spans,
@@ -66,7 +79,9 @@ func NewTree(spans []Span) *Tree {
 		children: make(map[string][]string, len(spans)),
 	}
 	for i := range spans {
-		t.byID[spans[i].SpanID] = &spans[i]
+		if spans[i].SpanID != "" {
+			t.byID[spans[i].SpanID] = &spans[i]
+		}
 	}
 	ordered := make([]Span, len(spans))
 	copy(ordered, spans)
@@ -74,6 +89,9 @@ func NewTree(spans []Span) *Tree {
 		return ordered[i].Start.Before(ordered[j].Start)
 	})
 	for i := range ordered {
+		if ordered[i].SpanID == "" {
+			continue
+		}
 		pid := ordered[i].ParentID
 		t.children[pid] = append(t.children[pid], ordered[i].SpanID)
 	}

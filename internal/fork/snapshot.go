@@ -98,7 +98,9 @@ func Snapshot(tree *ingest.Tree, atSpanID string) (StateSnapshot, error) {
 	// Reachable tool-calls: DFS from atSpanID's children, collect tool spans.
 	// Guard against a cyclic ParentID among descendants (mirrors diff.Subgraph's
 	// `seen` set) so a malformed trace cannot make the DFS recurse forever.
-	var reachable []string
+	// Initialized non-nil so the empty set marshals as [] rather than null,
+	// matching reached_spans for the same "nothing here" answer.
+	reachable := make([]string, 0)
 	seenKids := map[string]bool{}
 	var walk func(id string)
 	walk = func(id string) {

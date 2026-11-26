@@ -1,6 +1,7 @@
 package fork
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/SuperMarioYL/forkspan/internal/ingest"
@@ -140,6 +141,77 @@ func TestSnapshot_SelfCycleParentIDDoesNotHang(t *testing.T) {
 	if len(snap.ReachableToolCalls) != 1 || snap.ReachableToolCalls[0] != "dead0000dead0000" {
 		t.Errorf("ReachableToolCalls = %v, want [dead0000dead0000] (cycle broken)", snap.ReachableToolCalls)
 	}
+}
+
+// TestSnapshot_EmptyReachableToolCallsMarshalsAsArray is the regression test
+// for fix-empty-reachable-tool-calls-null: forking at a span with no
+// downstream tool calls must emit `"reachable_tool_calls": []` — the same empty
+// collection form reached_spans already uses. Pre-fix the nil slice marshalled
+// as `null`, so the snapshot encoded "no downstream tool calls" two different
+// ways in one object and any consumer iterating the set hit a null.
+func TestSnapshot_EmptyReachableToolCallsMarshalsAsArray(t *testing.T) {
+	tr := loadSample(t)
+	// The bash tool span is a leaf: no downstream tool calls.
+	snap, err := Snapshot(tr, "1112131415161718")
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	b, err := snap.MarshalJSON()
+	if err != nil {
+		t.Fatalf("MarshalJSON: %v", err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatalf("Unmarshal snapshot: %v", err)
+	}
+	got := raw["reachable_tool_calls"]
+	if got == nil {
+		t.Fatalf("reachable_tool_calls = null, want [] (empty set must marshal as an empty array)")
+	}
+	arr, ok := got.([]any)
+	if !ok {
+		t.Fatalf("reachable_tool_calls = %#v (%T), want a JSON array", got, got)
+	}
+	if len(arr) != 0 {
+		t.Errorf("reachable_tool_calls = %v, want [] for a leaf fork span", arr)
+	}
+	if _, ok := raw["reached_spans"].([]any); !ok {
+		t.Errorf("reached_spans = %#v, want a JSON array (the field this one must match)", raw["reached_spans"])
+	}
+}
+
+// TestSnapshot_EmptySpanIDDoesNotBecomeAncestor is the regression test for
+// fix-empty-span-id-hijacks-root-sentinel at the model boundary: a span record
+// with no spanId must never be indexed under "" (the model's "no parent"
+// sentinel), or every genuine root's empty ParentID resolves to it and the
+// root reports phantom ancestors. LoadBytes rejects such an export; NewTree is
+// the guard for direct/proto-path callers.
+func TestSnapshot_EmptySpanIDDoesNotBecomeAncestor(t *testing.T) {
+	spans := []ingest.Span{
+		{SpanID: "aaaa0000aaaa0000", Name: "agent.invoke", Role: ingest.RoleAgent},
+		// Unaddressable fragment: no spanId, parent is the tool span below.
+		{SpanID: "", ParentID: "bbbb0000bbbb0000", Name: "unidentified.fragment"},
+		{SpanID: "bbbb0000bbbb0000", Name: "tool.call.curl", Role: ingest.RoleTool, ToolName: "curl"},
+	}
+	tr := ingest.NewTree(spans)
+	if tr.Get("") != nil {
+		t.Fatal(`Tree.Get("") must be nil: "" is the no-parent sentinel, never a span id`)
+	}
+	snap, err := Snapshot(tr, "aaaa0000aaaa0000")
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	if len(snap.ReachedSpans) != 1 || snap.ReachedSpans[0].SpanID != "aaaa0000aaaa0000" {
+		t.Errorf("ReachedSpans = %v, want only the root (a root has no ancestors)", spanIDs(snap.ReachedSpans))
+	}
+}
+
+func spanIDs(spans []ingest.Span) []string {
+	out := make([]string, len(spans))
+	for i, s := range spans {
+		out[i] = s.SpanID
+	}
+	return out
 }
 
 func contains(s, sub string) bool {

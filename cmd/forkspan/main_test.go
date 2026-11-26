@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -172,6 +173,74 @@ func TestInspectSnapshot_DefaultPathNoDoubleOutput(t *testing.T) {
 	}
 }
 
+// TestInspectSnapshot_StdoutSentinelOutPrintsJSON is the regression test for
+// fix-snapshot-out-stdout-sentinel-dropped: "-" is the resolver's own stdout
+// sentinel (snapshotOutPath(true, "") returns "-"), so an explicit `-o -` must
+// mean "stdout, no file" too. Pre-fix the print branch keyed on --json alone,
+// so `-o -` made DumpSnapshot write nothing, then printed
+// "snapshot written → -" and exited 0 — a success message for a snapshot that
+// was silently discarded.
+func TestInspectSnapshot_StdoutSentinelOutPrintsJSON(t *testing.T) {
+	trace := sampleTraceAbs(t)
+	// Run from a temp dir so a regression that writes a file is caught there.
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	var stdout bytes.Buffer
+	root := newRoot()
+	root.SetArgs([]string{"inspect", trace, "-s", "0a0b0c0d0e0f0a0b", "-o", "-"})
+	root.SetOut(&stdout)
+	if err := root.Execute(); err != nil {
+		t.Fatalf("inspect -o -: %v", err)
+	}
+
+	var snap struct {
+		AtSpanID string `json:"at_span_id"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout.String())), &snap); err != nil {
+		t.Fatalf("stdout = %q, want the snapshot JSON for -o -: %v", stdout.String(), err)
+	}
+	if snap.AtSpanID != "0a0b0c0d0e0f0a0b" {
+		t.Errorf("at_span_id = %q, want 0a0b0c0d0e0f0a0b", snap.AtSpanID)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "-")); err == nil {
+		t.Error("`-o -` must not create a file named \"-\"; it means stdout")
+	}
+	if strings.Contains(stdout.String(), "snapshot written") {
+		t.Errorf("stdout = %q, want the JSON, not the written-path summary", stdout.String())
+	}
+}
+
+// TestInspect_OutputFlagsRequireSnapshot is the regression test for
+// fix-inspect-output-flags-launch-tui: --json and --out are output
+// destinations for the non-interactive snapshot, so without --snapshot/-s the
+// command must say so instead of silently launching the navigator and dropping
+// both flags. Pre-fix both invocations fell through to tui.Run (in a headless
+// test: "could not open a new TTY" after "opening navigator").
+func TestInspect_OutputFlagsRequireSnapshot(t *testing.T) {
+	trace := sampleTraceAbs(t)
+	for _, args := range [][]string{
+		{"inspect", trace, "--json"},
+		{"inspect", trace, "-o", filepath.Join(t.TempDir(), "snap.json")},
+	} {
+		var stdout, stderr bytes.Buffer
+		root := newRoot()
+		root.SetArgs(args)
+		root.SetOut(&stdout)
+		root.SetErr(&stderr)
+		err := root.Execute()
+		if err == nil {
+			t.Fatalf("%v: expected an error naming the missing --snapshot, got nil", args)
+		}
+		if !strings.Contains(err.Error(), "--snapshot") {
+			t.Errorf("%v: error = %q, want it to name --snapshot (not a TUI/TTY failure)", args, err)
+		}
+		if strings.Contains(err.Error(), "TTY") {
+			t.Errorf("%v: must not reach the navigator; got TTY error %q", args, err)
+		}
+	}
+}
+
 // ---- v0.5.0 milestones (fix-version-stale, fix-readme-snapshot-sample-stale,
 // feat-inspect-list-tree) ----
 
@@ -294,6 +363,26 @@ func TestVersion_SiteJSONInLockstep(t *testing.T) {
 	want := versionFromFile(t)
 	if sj.ContentVersion != want {
 		t.Errorf("web/site.json content_version = %q, want %q (VERSION file); bump both together", sj.ContentVersion, want)
+	}
+}
+
+// TestChangelog_NewestVersionMatchesVERSION extends the version-lockstep pins
+// to CHANGELOG.md: its newest `## vX.Y.Z` section must be the VERSION file's
+// tag, so a release cannot bump the manifest while leaving the human-facing
+// changelog a version behind. Like the other version pins it derives the
+// expectation from VERSION rather than a literal, so it never drifts itself.
+func TestChangelog_NewestVersionMatchesVERSION(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("../../", "CHANGELOG.md"))
+	if err != nil {
+		t.Fatalf("read CHANGELOG.md: %v", err)
+	}
+	heading := regexp.MustCompile(`(?m)^## (v[0-9]+\.[0-9]+\.[0-9]+)\s*$`)
+	m := heading.FindStringSubmatch(string(raw))
+	if m == nil {
+		t.Fatal("CHANGELOG.md has no `## vX.Y.Z` section heading")
+	}
+	if want := versionFromFile(t); m[1] != want {
+		t.Errorf("CHANGELOG.md newest section = %q, want %q (VERSION file); bump both together", m[1], want)
 	}
 }
 

@@ -328,3 +328,65 @@ func TestLoadBytes_FiniteDoubleValueUnchanged(t *testing.T) {
 		t.Error("a non-numeric doubleValue string must still be rejected, not silently accepted")
 	}
 }
+
+// TestLoadBytes_RejectsEmptySpanID is the regression test for
+// fix-empty-span-id-hijacks-root-sentinel (parse boundary): spanId is the
+// identity every surface keys on and "" is the model's "no parent" sentinel, so
+// an export containing a span record without one must be reported instead of
+// ingested. Pre-fix the record was indexed as byID[""], which made every real
+// root's empty parentSpanId resolve to it (phantom ancestors) and re-parented
+// the fragment into another span's subtree.
+func TestLoadBytes_RejectsEmptySpanID(t *testing.T) {
+	const trace = `{
+	  "resourceSpans": [{
+	    "scopeSpans": [{
+	      "spans": [
+	        {
+	          "traceId": "00112233445566778899aabbccddeeff",
+	          "spanId": "aaaa0000aaaa0000",
+	          "name": "agent.invoke",
+	          "startTimeUnixNano": "1785283200000000000"
+	        },
+	        {
+	          "traceId": "00112233445566778899aabbccddeeff",
+	          "spanId": "",
+	          "parentSpanId": "aaaa0000aaaa0000",
+	          "name": "unidentified.fragment",
+	          "startTimeUnixNano": "1785283200100000000"
+	        }
+	      ]
+	    }]
+	  }]
+	}`
+	_, err := LoadBytes([]byte(trace))
+	if err == nil {
+		t.Fatal("LoadBytes must reject a span record with an empty spanId, not ingest it")
+	}
+	if !contains(err.Error(), "spanId") {
+		t.Errorf("error = %q, want it to name the empty spanId", err)
+	}
+}
+
+// TestNewTree_EmptySpanIDNotIndexed is the model-level guard for
+// fix-empty-span-id-hijacks-root-sentinel: even when a caller hands NewTree a
+// span with no id (the proto/interop seam bypasses the LoadBytes check), the
+// empty id must never become a lookup key or a child edge, so every root keeps
+// exactly the ancestors it recorded.
+func TestNewTree_EmptySpanIDNotIndexed(t *testing.T) {
+	tr := NewTree([]Span{
+		{SpanID: "aaaa0000aaaa0000", Name: "agent.invoke"},
+		{SpanID: "", ParentID: "aaaa0000aaaa0000", Name: "unidentified.fragment"},
+	})
+	if tr.Get("") != nil {
+		t.Fatal(`Tree.Get("") must be nil: "" is the no-parent sentinel, never a span id`)
+	}
+	roots := tr.Roots()
+	if len(roots) != 1 || roots[0] != "aaaa0000aaaa0000" {
+		t.Fatalf("Roots = %v, want only [aaaa0000aaaa0000]", roots)
+	}
+	for _, kid := range tr.Children("aaaa0000aaaa0000") {
+		if kid == "" {
+			t.Error(`Children must not contain the empty id`)
+		}
+	}
+}

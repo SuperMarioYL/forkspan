@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "v0.10.0"
+var version = "v0.11.0"
 
 func main() {
 	if err := newRoot().Execute(); err != nil {
@@ -80,21 +80,32 @@ func newInspectCmd() *cobra.Command {
 
 			// Non-interactive snapshot dump path (the m1 "dump to stdout").
 			if snapshotID != "" {
-				// Resolve the destination once and drive the print branch on
-				// --json alone: an explicit --out is honored under --json
-				// (file + stdout), and the default-path case no longer echoes
-				// the full JSON to stdout AND writes the file.
+				// Resolve the destination once and drive the print branch on the
+				// RESOLVED destination, not on --json alone: --json means stdout,
+				// an explicit --out is honored under --json (file + stdout), and
+				// an explicit `-o -` is the same stdout destination the resolver
+				// already reserves for --json — without this it resolved to "-",
+				// DumpSnapshot wrote nothing, and the summary line claimed a file
+				// that does not exist. The default path still writes
+				// forkspan-snapshot.json and prints only the summary.
 				resolved := snapshotOutPath(asJSON, outPath)
 				b, err := tui.DumpSnapshot(tree, canonicalSpanID(snapshotID), resolved)
 				if err != nil {
 					return err
 				}
-				if asJSON {
+				if asJSON || resolved == "-" {
 					fmt.Fprintln(cmd.OutOrStdout(), string(b))
 				} else {
 					fmt.Fprintf(cmd.OutOrStdout(), "snapshot written → %s\n", resolved)
 				}
 				return nil
+			}
+
+			// --json/--out only make sense with an explicit fork point. Falling
+			// through to the navigator would silently drop them (the TUI writes
+			// to its own default path), so report the missing flag instead.
+			if asJSON || outPath != "" {
+				return fmt.Errorf("--json/--out require --snapshot/-s (use --list for the non-interactive tree)")
 			}
 
 			// Interactive navigator.
@@ -104,8 +115,8 @@ func newInspectCmd() *cobra.Command {
 		},
 	}
 	c.Flags().StringVarP(&snapshotID, "snapshot", "s", "", "dump the StateSnapshot at this span id (non-interactive)")
-	c.Flags().BoolVar(&asJSON, "json", false, "emit the snapshot as JSON to stdout (with --snapshot)")
-	c.Flags().StringVarP(&outPath, "out", "o", "", "write the snapshot to this path (default: forkspan-snapshot.json)")
+	c.Flags().BoolVar(&asJSON, "json", false, "emit the snapshot as JSON to stdout (requires --snapshot)")
+	c.Flags().StringVarP(&outPath, "out", "o", "", "write the snapshot to this path (default: forkspan-snapshot.json; \"-\" = stdout)")
 	c.Flags().BoolVarP(&listTree, "list", "l", false, "print the recorded span tree to stdout (non-interactive) and exit without the TUI")
 	c.Flags().BoolVar(&listTree, "print-tree", false, "alias for --list")
 	return c
@@ -114,7 +125,8 @@ func newInspectCmd() *cobra.Command {
 // snapshotOutPath resolves where DumpSnapshot should write the snapshot JSON.
 // An explicit --out always wins (so `--json -o <path>` writes the file AND
 // echoes JSON to stdout). Without --out: --json dumps to stdout only ("-",
-// no file); the plain default writes forkspan-snapshot.json.
+// no file); the plain default writes forkspan-snapshot.json. An explicit
+// `-o -` resolves to that same "-" stdout sentinel.
 func snapshotOutPath(asJSON bool, out string) string {
 	if out != "" {
 		return out

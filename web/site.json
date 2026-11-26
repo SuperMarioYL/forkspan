@@ -224,8 +224,13 @@
       }
     ]
   },
-  "content_version": "v0.10.0",
+  "content_version": "v0.11.0",
   "changelog": [
+    {
+      "version": "v0.11.0",
+      "en": "forkspan v0.11.0: snapshot output and span-identity fixes — `inspect -o -` now writes the snapshot JSON to stdout instead of reporting a file it never wrote; an empty `reachable_tool_calls` set serializes as `[]` instead of `null`; a span record without a `spanId` is rejected with a clear error instead of being indexed under the no-parent sentinel and fabricating ancestors for every root span; and `--json`/`--out` without `--snapshot` fail with usage guidance instead of silently launching the TUI. No new command, flag, dependency or scope.",
+      "zh": "forkspan v0.11.0：快照输出与 Span 身份修复——`inspect -o -` 现把快照 JSON 写到标准输出，不再报告一个从未写入的文件；空的 `reachable_tool_calls` 现序列化为 `[]` 而非 `null`；缺少 `spanId` 的 Span 记录会被明确报错拒绝，不再被索引到“无父节点”哨兵下、为每个根 Span 伪造祖先；未搭配 `--snapshot` 的 `--json`/`--out` 现给出用法错误，不再静默启动 TUI。无新增命令、参数、依赖或范围。"
+    },
     {
       "version": "v0.10.0",
       "en": "forkspan v0.10.0: query and parse-conformance fixes — `inspect -s <span-id>` now resolves hex span ids case-insensitively (and tolerates surrounding whitespace) as the OTLP spec requires, so an id copied from a spec-conforming export no longer fails with \"not in tree\"; the proto3-JSON non-finite double encodings (\"NaN\" / \"Infinity\" / \"-Infinity\") are accepted instead of aborting the whole trace parse; and the remaining OTel-GenAI model-invocation operations (text_completion, embeddings) classify as LLM spans instead of rendering as unclassified. No new command, flag, dependency or scope.",
